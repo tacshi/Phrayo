@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "句芽";
+"NSMicrophoneUsageDescription" = "錄下想說的話，用於翻譯與口語練習。";
+"NSSpeechRecognitionUsageDescription" = "將語音轉成文字，用於翻譯與練習。";

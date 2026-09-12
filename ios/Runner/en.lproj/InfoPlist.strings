@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "Phrayo";
+"NSMicrophoneUsageDescription" = "Record what you want to say and practise expressions.";
+"NSSpeechRecognitionUsageDescription" = "Transcribe speech for translation and practice.";

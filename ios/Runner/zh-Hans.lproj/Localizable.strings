@@ -1,0 +1,9 @@
+"Start speaking" = "开始说话";
+"Stop recording" = "结束录音";
+"Recording" = "录音中";
+"Paused" = "已暂停";
+"Microphone enabled. Run the shortcut again." = "麦克风已授权，请再次运行快捷指令。";
+"Allow microphone access in Phrayo settings." = "请在句芽设置中允许使用麦克风。";
+"Enable Live Activities in Phrayo settings." = "请在句芽设置中开启实时活动。";
+"Finish the current recording first." = "请先结束当前录音。";
+"Open Phrayo and try again." = "请打开句芽后重试。";

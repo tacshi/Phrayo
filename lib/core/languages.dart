@@ -1,0 +1,18 @@
+const languages = {
+  'zh-CN': '中文（普通话）',
+  'en-US': 'English (US)',
+  'en-GB': 'English (UK)',
+  'en-NZ': 'English (NZ)',
+  'ja-JP': '日本語',
+  'ko-KR': '한국어',
+  'fr-FR': 'Français',
+  'de-DE': 'Deutsch',
+  'es-ES': 'Español',
+  'it-IT': 'Italiano',
+  'pt-BR': 'Português',
+  'ar-SA': 'العربية',
+  'hi-IN': 'हिन्दी',
+  'vi-VN': 'Tiếng Việt',
+  'th-TH': 'ไทย',
+  'id-ID': 'Bahasa Indonesia',
+};
