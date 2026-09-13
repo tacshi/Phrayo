@@ -13,6 +13,14 @@ flutter run -d <device-id>
 
 Use Flutter or Xcode for Debug launches. For standalone device testing, select Profile or Release and configure signing for both Runner and PhrayoActivity in `ios/Runner.xcworkspace`.
 
+### Local voices
+
+CosyVoice 3 runs on the device for English, Mandarin, Japanese and Cantonese. In **Settings → Listening voice**, download the shared model (1.4 GB), then tap **Preview voice**. The fixed voice and Japanese reading dictionary are bundled with the app. Other languages use installed system voices. No TTS API key or cloud speech request is used.
+
+Swift packages are pinned in the Xcode project. The normal build compiles and caches MLX Metal shaders for the selected iOS SDK through `scripts/build-ios-voice-metal.py`; no Rust toolchain is needed. Generate the bridge with `bash scripts/generate-native.sh` to retain main-thread event delivery.
+
+Choose **粵語（香港）** as the spoken or target language for Cantonese. Recognition uses the selected transcription provider; translation into or from Cantonese uses the configured text model when Apple does not advertise an explicit Cantonese translation language. On-device-only mode never enables cloud translation implicitly.
+
 To build and install on physical devices with the same device picker as 115Lab:
 
 ```sh
@@ -37,7 +45,7 @@ Keys are saved in the device Keychain. On-device-only mode does not call either 
 
 ## Features
 
-- Hold-to-speak translation, editable source text, system speech playback and explicit text rewrites.
+- Hold-to-speak translation, editable source text, local speech playback and explicit text rewrites.
 - Saved expressions, source-clip playback, active recall, recorded attempts and spaced review.
 - Native segmented audio capture, pause/resume, recoverable M4A export and long-recording transcription.
 - Speaker/segment selection, source-linked key points and generated practice expressions.
@@ -58,10 +66,12 @@ Apple recognition processes the saved audio after capture. Soniox provides the l
 Regenerate checked-in outputs after changing their schemas:
 
 ```sh
-dart run pigeon --input pigeons/native.dart
+bash scripts/generate-native.sh
 dart run build_runner build
 dart format lib test pigeons
 ```
+
+The bridge generation script keeps native-to-Flutter events on the main actor, as required by [Flutter platform channels](https://docs.flutter.dev/platform-integration/platform-channels#channels-and-platform-threading). Use the script when regenerating the schema.
 
 `Phrayo.png` is the logo used by the app. `swift scripts/render_brand.swift` generates the opaque iOS icon and 24/40/60-pixel previews from it. Older SVG/PDF and alternate-color exports in `assets/brand` are not used by the app. The Xcode project is checked in; `scripts/configure_ios.rb` documents its target/resource setup and requires the `xcodeproj` Ruby gem only when rerun.
 

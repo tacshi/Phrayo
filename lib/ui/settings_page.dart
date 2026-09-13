@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -29,6 +31,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String selectedModel = '';
   List<String> models = const [];
   bool connectionTested = false;
+  double? ttsFraction;
+  StreamSubscription<double?>? ttsSub;
+  String voiceStatus = 'checking';
+  int voiceRevision = 0;
   final soniox = TextEditingController(), llm = TextEditingController();
   @override
   void initState() {
@@ -42,10 +48,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     transcriptionTerms = s.transcriptionTerms;
     provider = s.provider;
     selectedModel = s.model;
+    ref.listenManual(settingsProvider, (previous, next) {
+      final sourceChanged =
+          previous?.source != next.source && source != next.source;
+      final targetChanged =
+          previous?.target != next.target && target != next.target;
+      if (!sourceChanged && !targetChanged) return;
+      setState(() {
+        if (sourceChanged) source = next.source;
+        if (targetChanged) {
+          target = next.target;
+          voiceStatus = 'checking';
+        }
+        capabilities = null;
+      });
+      if (targetChanged) unawaited(refreshVoice());
+    });
+    ttsSub = ref.read(nativeProvider).ttsDownloadProgress.listen((f) {
+      if (!mounted) return;
+      setState(() => ttsFraction = f);
+      if (f == null) unawaited(refreshVoice());
+    });
+    unawaited(refreshVoice());
   }
 
   @override
   void dispose() {
+    ttsSub?.cancel();
     soniox.dispose();
     llm.dispose();
     super.dispose();
@@ -138,6 +167,131 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (mounted) setState(() => capabilities = c);
     });
     if (mounted) setState(() => busy = false);
+  }
+
+  Future<void> refreshVoice() async {
+    final revision = ++voiceRevision;
+    final language = target;
+    String status;
+    try {
+      status = await ref
+          .read(nativeProvider)
+          .api
+          .ttsStatus(language)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      status = 'unavailable';
+    }
+    if (mounted && revision == voiceRevision && language == target) {
+      setState(() => voiceStatus = status);
+    }
+  }
+
+  Future<void> downloadNeural() async {
+    setState(() {
+      busy = true;
+      operation = 'voice';
+      ttsFraction = 0;
+    });
+    await action(context, () async {
+      await save(includeLlm: false);
+      await ref.read(nativeProvider).api.prepareTts([target]);
+    });
+    if (!mounted) return;
+    setState(() {
+      busy = false;
+      ttsFraction = null;
+    });
+    await refreshVoice();
+  }
+
+  Future<void> previewVoice() async {
+    setState(() {
+      busy = true;
+      operation = 'preview';
+    });
+    await action(
+      context,
+      () => ref
+          .read(nativeProvider)
+          .api
+          .previewTts(target, voiceStatus == 'ready'),
+    );
+    if (!mounted) return;
+    setState(() => busy = false);
+    await refreshVoice();
+  }
+
+  Widget voiceControls() {
+    final downloading = voiceStatus == 'downloading' || ttsFraction != null;
+    final checking = voiceStatus == 'checking';
+    final status = switch (voiceStatus) {
+      'ready' => 'neural_ready',
+      'repair' => 'voice_repair',
+      'unavailable' => 'voice_unavailable',
+      'downloading' => 'downloading',
+      _ => 'system_voice',
+    };
+    return Column(
+      key: const ValueKey('listening-voice'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionLabel(tr(context, 'listening_voice')),
+        if (!checking) Text(tr(context, status)),
+        if (downloading || (busy && operation == 'preview'))
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(
+              value: downloading ? ttsFraction : null,
+            ),
+          ),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            TextButton.icon(
+              key: const ValueKey('preview-voice'),
+              onPressed:
+                  busy ||
+                      downloading ||
+                      checking ||
+                      voiceStatus == 'repair' ||
+                      voiceStatus == 'unavailable'
+                  ? null
+                  : previewVoice,
+              icon: const Icon(Icons.volume_up_outlined),
+              label: Text(tr(context, 'preview_voice')),
+            ),
+            if (voiceStatus == 'download' || voiceStatus == 'repair')
+              TextButton(
+                key: const ValueKey('download-voice'),
+                onPressed: busy || downloading ? null : downloadNeural,
+                child: Text(
+                  tr(
+                    context,
+                    voiceStatus == 'repair'
+                        ? 'repair_voice'
+                        : 'neural_download',
+                  ),
+                ),
+              ),
+            if (downloading)
+              TextButton(
+                onPressed: () => action(
+                  context,
+                  () => ref.read(nativeProvider).api.cancelTts(),
+                ),
+                child: Text(tr(context, 'cancel')),
+              ),
+            if (voiceStatus == 'unavailable')
+              TextButton(
+                onPressed: busy ? null : refreshVoice,
+                child: Text(tr(context, 'retry')),
+              ),
+          ],
+        ),
+      ],
+    );
   }
 
   Future<void> test(bool cloud) async {
@@ -253,6 +407,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: DropdownButtonFormField<String>(
+          key: ValueKey('$label-$value'),
           initialValue: value,
           isExpanded: true,
           decoration: settingDecoration(label),
@@ -268,6 +423,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       capabilities = null;
                     });
                     commit();
+                    if (label == 'target_language') {
+                      setState(() => voiceStatus = 'checking');
+                      unawaited(refreshVoice());
+                    }
                   }
                 },
         ),
@@ -515,6 +674,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   commit();
                 },
         ),
+        voiceControls(),
         SectionLabel(tr(context, 'mode')),
         RadioGroup<bool>(
           groupValue: localOnly,
@@ -592,14 +752,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             capabilities!.translationStatus == 'installed'
                 ? 'ready'
                 : capabilities!.translationStatus,
-          ),
-          capabilityRow(
-            'listen',
-            capabilities!.voices.any(
-                  (s) => s.startsWith(target.split('-').first),
-                )
-                ? 'ready'
-                : 'download',
           ),
         ],
         if (busy && operation == 'resources')

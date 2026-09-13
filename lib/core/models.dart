@@ -157,10 +157,15 @@ class Recording {
     'summary': summary,
   };
   String get displayTitle {
-    final transcript = segments
-        .map((segment) => segment.text.trim())
-        .where((text) => text.isNotEmpty)
-        .join(' ');
+    // Apple recognition can emit individual characters, including fragments of
+    // Latin words inside CJK speech. Preserve its spacing for these languages.
+    final language = sourceLanguage.replaceAll('_', '-').split('-').first;
+    final transcript = ['zh', 'yue', 'ja'].contains(language)
+        ? segments.map((segment) => segment.text).join().trim()
+        : segments
+              .map((segment) => segment.text.trim())
+              .where((text) => text.isNotEmpty)
+              .join(' ');
     return transcript.isEmpty ? title.trim() : transcript;
   }
 

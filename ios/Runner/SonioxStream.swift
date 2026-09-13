@@ -58,12 +58,17 @@ import Foundation
   {
     var config: [String: Any] = [
       "api_key": key, "model": "stt-rt-v5", "audio_format": "pcm_s16le", "sample_rate": 16000,
-      "num_channels": 1, "language_hints": [String(source.prefix(2))],
+      "num_channels": 1, "language_hints": [SpeechLanguage.sonioxCode(source)],
       "enable_language_identification": true,
-      "translation": ["type": "one_way", "target_language": String(target.prefix(2))],
+      "translation": ["type": "one_way", "target_language": SpeechLanguage.sonioxCode(target)],
     ]
-    if source.prefix(2) == target.prefix(2) { config.removeValue(forKey: "translation") }
-    if !terms.isEmpty { config["context"] = ["terms": terms] }
+    if SpeechLanguage.sonioxCode(source) == SpeechLanguage.sonioxCode(target)
+      || SpeechLanguage.isCantonese(target)
+    {
+      config.removeValue(forKey: "translation")
+    }
+    let context = SpeechLanguage.sonioxContext(source: source, terms: terms)
+    if !context.isEmpty { config["context"] = context }
     return config
   }
   func append(_ data: Data) { continuation.yield(data) }

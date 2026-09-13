@@ -20,10 +20,16 @@ enum AppleSpeech {
     dictation: Bool, locale: Locale
   ) {
     let requested = Locale(identifier: source)
-    let speech =
+    let speechCandidate =
       SpeechTranscriber.isAvailable
       ? await SpeechTranscriber.supportedLocale(equivalentTo: requested) : nil
-    let dictation = await DictationTranscriber.supportedLocale(equivalentTo: requested)
+    let dictationCandidate = await DictationTranscriber.supportedLocale(equivalentTo: requested)
+    let speech = speechCandidate.flatMap {
+      SpeechLanguage.isCantonese(source) && !SpeechLanguage.isCantonese($0.identifier) ? nil : $0
+    }
+    let dictation = dictationCandidate.flatMap {
+      SpeechLanguage.isCantonese(source) && !SpeechLanguage.isCantonese($0.identifier) ? nil : $0
+    }
     if prefersDictation(
       hasTerms: !terms.isEmpty, supportsSpeech: speech != nil, supportsDictation: dictation != nil),
       let dictation
@@ -113,16 +119,37 @@ enum AppleSpeech {
     }
   }
   static func translate(_ text: String, _ source: String, _ target: String) async throws -> String {
-    if source == target { return text }
+    if source == target
+      || (SpeechLanguage.isCantonese(source) && SpeechLanguage.isCantonese(target))
+    {
+      return text
+    }
+    let pair = try await translationPair(source, target)
     let status = await LanguageAvailability().status(
-      from: Locale.Language(identifier: source), to: Locale.Language(identifier: target))
+      from: pair.source, to: pair.target)
     guard status == .installed else {
       throw appError(status == .unsupported ? "language_unsupported" : "resources_missing")
     }
     let session = TranslationSession(
-      installedSource: Locale.Language(identifier: source),
-      target: Locale.Language(identifier: target))
+      installedSource: pair.source, target: pair.target)
     return try await session.translate(text).targetText
+  }
+
+  static func translationPair(_ source: String, _ target: String) async throws
+    -> (source: Locale.Language, target: Locale.Language)
+  {
+    let supported =
+      (SpeechLanguage.isCantonese(source) || SpeechLanguage.isCantonese(target))
+      ? await LanguageAvailability().supportedLanguages : []
+    func language(_ code: String) throws -> Locale.Language {
+      guard SpeechLanguage.isCantonese(code) else { return Locale.Language(identifier: code) }
+      // zh-HK may be accepted as a regional alias for Mandarin. Only an
+      // explicitly advertised Yue language establishes Cantonese translation.
+      guard let cantonese = supported.first(where: { $0.minimalIdentifier.hasPrefix("yue") })
+      else { throw appError("cantonese_translation_model") }
+      return cantonese
+    }
+    return (try language(source), try language(target))
   }
 }
 

@@ -11,16 +11,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phrayo/main.dart';
 import 'package:phrayo/core/providers.dart';
 import 'package:phrayo/core/models.dart';
-import 'package:phrayo/core/native.g.dart';
 import 'package:phrayo/services/platform.dart';
 import 'package:phrayo/ui/strings.dart';
+
+import 'support/ready_speech_native.dart';
 
 class ChineseSettings extends SettingsController {
   @override
   AppSettings build() => const AppSettings(locale: 'zh-Hant');
 }
 
-class DelayedTranslation extends PhrayoNative {
+class DelayedTranslation extends ReadySpeechNative {
   final pending = Completer<String>();
   @override
   Future<String> translate(String text, String source, String target) =>

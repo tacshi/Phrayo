@@ -5,6 +5,31 @@ import XCTest
 @testable import Runner
 
 final class RunnerTests: XCTestCase {
+  func testJapaneseVoiceReadingsUseParticlesAndCommonCounters() throws {
+    let speech = try JapaneseSpeechText()
+    let particles = try speech.readings("今日は東京へ行きます。")
+    XCTAssertTrue(particles.contains("ワ"))
+    XCTAssertTrue(particles.contains("エ"))
+    let counters = try speech.readings("2人で3本の傘を買います。").replacingOccurrences(of: " ", with: "")
+    XCTAssertTrue(counters.contains("フタリ"))
+    XCTAssertTrue(counters.contains("サンボン"))
+    XCTAssertFalse(counters.contains("ニニン"))
+  }
+
+  @MainActor
+  func testCantoneseSonioxConfigurationPreservesDialectAndDoesNotRequestMandarinTranslation() {
+    let source = SonioxStream.configuration(
+      key: "test", source: "yue-HK", target: "en-US", terms: ["唔該"])
+    XCTAssertEqual(source["language_hints"] as? [String], ["zh"])
+    XCTAssertEqual((source["translation"] as? [String: String])?["target_language"], "en")
+    let context = source["context"] as? [String: Any]
+    XCTAssertEqual(context?["terms"] as? [String], ["唔該"])
+    XCTAssertNotNil(context?["general"])
+    let target = SonioxStream.configuration(
+      key: "test", source: "en-US", target: "yue-HK", terms: [])
+    XCTAssertNil(target["translation"])
+  }
+
   func testVocabularyNormalizationAndShortcutPersistence() throws {
     let name = "PhrayoVocabularyTests-\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: name)!

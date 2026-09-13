@@ -14,7 +14,9 @@ import 'package:phrayo/services/platform.dart';
 import 'package:phrayo/services/text_processor.dart';
 import 'package:phrayo/ui/speak_page.dart';
 
-class RetranslationNative extends PhrayoNative {
+import 'support/ready_speech_native.dart';
+
+class RetranslationNative extends ReadySpeechNative {
   final requests = <String>[];
   Completer<String>? pending;
   @override

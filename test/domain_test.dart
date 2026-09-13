@@ -4,6 +4,47 @@ import 'package:phrayo/services/transcription.dart';
 import 'package:phrayo/services/text_processor.dart';
 
 void main() {
+  test(
+    'recording title preserves CJK fragments and supplied English spaces',
+    () {
+      Recording recording(String language, List<String> parts) => Recording(
+        id: 'r',
+        title: 'Fallback',
+        path: '/fixture',
+        seconds: 1,
+        sourceLanguage: language,
+        segments: [
+          for (final (index, text) in parts.indexed)
+            Segment(id: '$index', text: text, start: 0, end: 1),
+        ],
+      );
+      for (final language in ['zh-CN', 'zh_HK', 'yue-HK', 'ja-JP']) {
+        expect(
+          recording(language, [
+            '今',
+            '天',
+            '晚',
+            '饭',
+            '吃',
+            '什么',
+            '呢',
+            '？',
+          ]).displayTitle,
+          '今天晚饭吃什么呢？',
+        );
+        expect(
+          recording(language, ['用', 'Open', 'AI', ' API', '。']).displayTitle,
+          '用OpenAI API。',
+        );
+        expect(recording(language, [' ', '']).displayTitle, 'Fallback');
+      }
+      expect(
+        recording('en-US', ['Hello', 'world.', ' How are you?']).displayTitle,
+        'Hello world. How are you?',
+      );
+    },
+  );
+
   test('review intervals advance and reset without skipping day one', () {
     final now = DateTime.utc(2026, 9, 9);
     var phrase = Expression(id: 'p', source: '你好', target: 'Hello');

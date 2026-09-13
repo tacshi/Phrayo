@@ -21,6 +21,64 @@ class RecordingNative extends PhrayoNative {
 
 void main() {
   testWidgets(
+    'Chinese recording titles preserve recognition fragment spacing',
+    (tester) async {
+      final recording = Recording(
+        id: 'fragments',
+        title: '',
+        path: '/fixture',
+        seconds: 5,
+        sourceLanguage: 'zh-CN',
+        segments: [
+          for (final (index, text) in [
+            '现',
+            '在',
+            '这',
+            '个',
+            'A',
+            'pp',
+            '支持',
+            '粤',
+            '语',
+            '了',
+            '，',
+            '你',
+            '看',
+            '效',
+            '果',
+            '怎',
+            '么',
+            '样',
+            '。',
+          ].indexed)
+            Segment(
+              id: '$index',
+              text: text,
+              start: index / 4,
+              end: (index + 1) / 4,
+            ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bootstrapProvider.overrideWith((ref) async {}),
+            expressionsProvider.overrideWith((ref) => Stream.value([])),
+            recordingsProvider.overrideWith((ref) => Stream.value([recording])),
+          ],
+          child: const PhrayoApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Recordings'));
+      await tester.pumpAndSettle();
+      expect(find.text('现在这个App支持粤语了，你看效果怎么样。'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'recording titles use current transcripts without duplicate dates',
     (tester) async {
       final rows = [

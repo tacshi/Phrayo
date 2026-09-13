@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
@@ -9,6 +11,7 @@ import '../core/providers.dart';
 import 'common.dart';
 import 'library_page.dart';
 import 'strings.dart';
+import 'speech_button.dart';
 
 class SpeakPage extends ConsumerStatefulWidget {
   const SpeakPage({super.key});
@@ -23,6 +26,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
   String? sessionId, audioPath, finalAppliedId, editedSessionId;
   int revision = 0;
   bool busy = false, starting = false, pressed = false, saving = false;
+  bool changingLanguage = false;
   CancelToken? cancellation;
   @override
   void dispose() {
@@ -44,7 +48,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
   }
 
   Future<void> start() async {
-    if (starting) return;
+    if (starting || changingLanguage) return;
     setState(() => starting = true);
     revision++;
     cancellation?.cancel();
@@ -89,7 +93,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
 
   Future<void> translate() async {
     final text = input.text.trim();
-    if (text.isEmpty || busy || starting) return;
+    if (text.isEmpty || busy || starting || changingLanguage) return;
     final generation = ++revision;
     cancellation?.cancel();
     final token = CancelToken();
@@ -113,6 +117,19 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     } finally {
       if (mounted && generation == revision) setState(() => busy = false);
     }
+  }
+
+  Future<void> changeLanguage(String field, String value) async {
+    if (changingLanguage) return;
+    final settings = ref.read(settingsProvider);
+    if (settings.toJson()[field] == value) return;
+    setState(() => changingLanguage = true);
+    await action(context, () async {
+      await ref
+          .read(settingsProvider.notifier)
+          .save(AppSettings.fromJson({...settings.toJson(), field: value}));
+    });
+    if (mounted) setState(() => changingLanguage = false);
   }
 
   Future<void> process(String key) async {
@@ -217,6 +234,16 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
             output = s.translation;
           }
         });
+        if (s.state == 'saved' &&
+            s.translation.isEmpty &&
+            s.transcript.isNotEmpty) {
+          final settings = ref.read(settingsProvider);
+          if (s.sourceLanguage == settings.source &&
+              s.targetLanguage == settings.target &&
+              (isCantonese(settings.source) || isCantonese(settings.target))) {
+            unawaited(translate());
+          }
+        }
         if (s.error != null) notice(context, errorKey(StateError(s.error!)));
       });
     });
@@ -239,6 +266,10 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         session.kind != 'recording' &&
         session.state == 'recording';
     final processing = session?.state == 'processing';
+    final languagesLocked =
+        starting ||
+        changingLanguage ||
+        ['recording', 'paused', 'processing'].contains(session?.state);
     final settings = ref.watch(settingsProvider);
     final colors = Theme.of(context).colorScheme;
     return LayoutBuilder(
@@ -253,9 +284,13 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          languages[settings.source] ?? settings.source,
-                          style: Theme.of(context).textTheme.labelLarge,
+                        child: _LanguageDropdown(
+                          key: const ValueKey('speak-source-language'),
+                          label: tr(context, 'source_language'),
+                          value: settings.source,
+                          onChanged: languagesLocked
+                              ? null
+                              : (value) => changeLanguage('source', value),
                         ),
                       ),
                       const Padding(
@@ -263,9 +298,13 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                         child: Icon(Icons.arrow_forward_rounded, size: 18),
                       ),
                       Expanded(
-                        child: Text(
-                          languages[settings.target] ?? settings.target,
-                          style: Theme.of(context).textTheme.labelLarge,
+                        child: _LanguageDropdown(
+                          key: const ValueKey('speak-target-language'),
+                          label: tr(context, 'target_language'),
+                          value: settings.target,
+                          onChanged: languagesLocked
+                              ? null
+                              : (value) => changeLanguage('target', value),
                         ),
                       ),
                     ],
@@ -315,7 +354,10 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                         const SizedBox(width: 12),
                         TextButton(
                           key: const ValueKey('translate-speech'),
-                          onPressed: busy || input.text.trim().isEmpty
+                          onPressed:
+                              busy ||
+                                  changingLanguage ||
+                                  input.text.trim().isEmpty
                               ? null
                               : translate,
                           child: Text(tr(context, 'translate')),
@@ -346,16 +388,10 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              IconButton(
-                                tooltip: tr(context, 'listen'),
-                                onPressed: () => action(
-                                  context,
-                                  () => ref
-                                      .read(nativeProvider)
-                                      .api
-                                      .speak(output, settings.target),
-                                ),
-                                icon: const Icon(Icons.volume_up_rounded),
+                              SpeechButton(
+                                text: output,
+                                language: settings.target,
+                                enabled: !busy && !recording && !starting,
                               ),
                               IconButton(
                                 tooltip: tr(context, saved ? 'saved' : 'save'),
@@ -457,10 +493,10 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                   Center(
                     child: Semantics(
                       key: const ValueKey("speak-control"),
-                      enabled: !busy && !processing,
+                      enabled: !busy && !processing && !changingLanguage,
                       button: true,
                       label: tr(context, recording ? 'stop' : 'start'),
-                      onTap: busy || processing
+                      onTap: busy || processing || changingLanguage
                           ? null
                           : () {
                               pressed = true;
@@ -473,7 +509,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                             },
                       child: ExcludeSemantics(
                         child: Listener(
-                          onPointerDown: busy || processing
+                          onPointerDown: busy || processing || changingLanguage
                               ? null
                               : (_) {
                                   pressed = true;
@@ -542,6 +578,70 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
           ],
         );
       },
+    );
+  }
+}
+
+class _LanguageDropdown extends StatelessWidget {
+  final String label, value;
+  final ValueChanged<String>? onChanged;
+  const _LanguageDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final choices = {
+      ...languages,
+      if (!languages.containsKey(value)) value: value,
+    };
+    return Semantics(
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          itemHeight: null,
+          menuWidth: 280,
+          menuMaxHeight: 400,
+          borderRadius: BorderRadius.circular(12),
+          underline: const SizedBox.shrink(),
+          style: Theme.of(context).textTheme.labelLarge,
+          selectedItemBuilder: (_) => [
+            for (final name in choices.values)
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+          ],
+          items: [
+            for (final entry in choices.entries)
+              DropdownMenuItem(
+                value: entry.key,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(entry.value),
+                ),
+              ),
+          ],
+          onChanged: onChanged == null
+              ? null
+              : (value) {
+                  if (value != null) onChanged!(value);
+                },
+        ),
+      ),
     );
   }
 }

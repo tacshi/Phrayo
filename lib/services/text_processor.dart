@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../core/models.dart';
+import '../core/languages.dart';
 import '../core/llm_provider.dart';
 import 'llm_credentials.dart';
 import 'platform.dart';
@@ -92,7 +93,10 @@ class TextProcessor {
     if (settings.usesTextModel) {
       result = '';
       await for (final value in rewrite(
-        'Translate from ${settings.source} to ${settings.target}. ${style.prompt} Return only the complete translation.',
+        'Translate from ${settings.source} to ${settings.target}. '
+        '${isCantonese(settings.source) ? "The source language is Cantonese, not Mandarin. " : ""}'
+        '${isCantonese(settings.target) ? "Use natural colloquial Cantonese vocabulary and grammar, written in Traditional Chinese characters. " : ""}'
+        '${style.prompt} Return only the complete translation.',
         text,
         settings,
         cancel: cancel,

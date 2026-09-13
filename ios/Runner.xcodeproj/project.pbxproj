@@ -18,6 +18,8 @@
 		4F4FDDF233B155AF88B4C378 /* SonioxStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA57B63FA3D7B89169BCEB23 /* SonioxStream.swift */; };
 		D2FFF109FA2C41B086C330A8 /* MossTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABB89664F4C8470284EEBC99 /* MossTranscription.swift */; };
 		5C110D08DC89E847D7AA405C /* PhrayoHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D32E47D58E82BB408177695 /* PhrayoHost.swift */; };
+		7B1A2C3D4E5F6071829304A7 /* CosyVoiceTTS in Frameworks */ = {isa = PBXBuildFile; productRef = 7B1A2C3D4E5F6071829304A6 /* CosyVoiceTTS */; };
+		7B1A2C3D4E5F6071829304AB /* LocalTTS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304AA /* LocalTTS.swift */; };
 		61B758B43B13EAF72A146188 /* Native.g.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4E96520D1C94CA64FB3E483 /* Native.g.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		781B1828E1511F34CD69FF5F /* PhrayoActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = BE0EC5DF425E3B84BCC8EC1D /* PhrayoActivity.appex */; };
@@ -34,6 +36,16 @@
 		E543DF07DFF94DE5D7B7D83F /* PhrayoActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44FAB8744F8A7B63CCF0CA80 /* PhrayoActivity.swift */; };
 		F0BC0E31D8153AD9AE5B519E /* RecordingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5DE8BC8E451FD6757C46A8D /* RecordingAttributes.swift */; };
 		FC3C62DE4F18D60EB6659042 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 0AFB275910FEF8EF7349E0DE /* Localizable.strings */; };
+		7B1A2C3D4E5F6071829304AD /* SpeechPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304AC /* SpeechPlayback.swift */; };
+		7B1A2C3D4E5F6071829304B1 /* SpeechLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304B0 /* SpeechLanguage.swift */; };
+		7B1A2C3D4E5F6071829304B4 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 7B1A2C3D4E5F6071829304B3; };
+		7B1A2C3D4E5F6071829304B7 /* Mecab-Swift in Frameworks */ = {isa = PBXBuildFile; productRef = 7B1A2C3D4E5F6071829304B6; };
+		7B1A2C3D4E5F6071829304B9 /* IPADic in Frameworks */ = {isa = PBXBuildFile; productRef = 7B1A2C3D4E5F6071829304B8; };
+		7B1A2C3D4E5F6071829304BB /* VoiceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304BA; };
+		7B1A2C3D4E5F6071829304BD /* VoiceTextSegments.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304BC; };
+		7B1A2C3D4E5F6071829304BF /* JapaneseSpeechText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304BE; };
+		7B1A2C3D4E5F6071829304C1 /* VoiceAssets in Resources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304C0; };
+		7B1A2C3D4E5F6071829304C4 /* VoiceAudioCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304C3; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -105,6 +117,7 @@
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		97E30E96EFE85566A9DC40D2 /* en */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		9D32E47D58E82BB408177695 /* PhrayoHost.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhrayoHost.swift; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304AA /* LocalTTS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalTTS.swift; sourceTree = "<group>"; };
 		B001EF6C2C25CFF5C8E91D1D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B4A8DFBD46291A6EAB6EFA1A /* AppleSpeech.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleSpeech.swift; sourceTree = "<group>"; };
 		BE0EC5DF425E3B84BCC8EC1D /* PhrayoActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PhrayoActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -114,6 +127,13 @@
 		DA57B63FA3D7B89169BCEB23 /* SonioxStream.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SonioxStream.swift; sourceTree = "<group>"; };
 		ABB89664F4C8470284EEBC99 /* MossTranscription.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MossTranscription.swift; sourceTree = "<group>"; };
 		F4E96520D1C94CA64FB3E483 /* Native.g.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Native.g.swift; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304AC /* SpeechPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechPlayback.swift; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304B0 /* SpeechLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechLanguage.swift; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304BA /* VoiceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModel.swift; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304BC /* VoiceTextSegments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceTextSegments.swift; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304BE /* JapaneseSpeechText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapaneseSpeechText.swift; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304C0 /* VoiceAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = VoiceAssets; sourceTree = "<group>"; };
+		7B1A2C3D4E5F6071829304C3 /* VoiceAudioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceAudioCache.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +149,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B1A2C3D4E5F6071829304A7 /* CosyVoiceTTS in Frameworks */,
+				7B1A2C3D4E5F6071829304B9 /* IPADic in Frameworks */,
+				7B1A2C3D4E5F6071829304B7 /* Mecab-Swift in Frameworks */,
+				7B1A2C3D4E5F6071829304B4 /* MLX in Frameworks */,
 				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -203,6 +227,14 @@
 				65850617371EF8B7F66E57D8 /* AudioCapture.swift */,
 				F4E96520D1C94CA64FB3E483 /* Native.g.swift */,
 				9D32E47D58E82BB408177695 /* PhrayoHost.swift */,
+				7B1A2C3D4E5F6071829304AA /* LocalTTS.swift */,
+				7B1A2C3D4E5F6071829304C3 /* VoiceAudioCache.swift */,
+				7B1A2C3D4E5F6071829304C0 /* VoiceAssets */,
+				7B1A2C3D4E5F6071829304BE /* JapaneseSpeechText.swift */,
+				7B1A2C3D4E5F6071829304BC /* VoiceTextSegments.swift */,
+				7B1A2C3D4E5F6071829304BA /* VoiceModel.swift */,
+				7B1A2C3D4E5F6071829304B0 /* SpeechLanguage.swift */,
+				7B1A2C3D4E5F6071829304AC /* SpeechPlayback.swift */,
 				D5DE8BC8E451FD6757C46A8D /* RecordingAttributes.swift */,
 				CC8481ADFC77A856AE75AD1B /* RecordingIntents.swift */,
 				DA57B63FA3D7B89169BCEB23 /* SonioxStream.swift */,
@@ -256,6 +288,7 @@
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
 				9740EEB61CF901F6004384FC /* Run Script */,
+				7B1A2C3D4E5F6071829304C2 /* Prepare Voice Metal */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				44E1F590345F087617E8C60D /* Embed App Extensions */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
@@ -270,6 +303,10 @@
 			);
 			name = Runner;
 			packageProductDependencies = (
+				7B1A2C3D4E5F6071829304A6 /* CosyVoiceTTS */,
+				7B1A2C3D4E5F6071829304B8 /* IPADic */,
+				7B1A2C3D4E5F6071829304B6 /* Mecab-Swift */,
+				7B1A2C3D4E5F6071829304B3 /* MLX */,
 				78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */,
 			);
 			productName = Runner;
@@ -325,6 +362,9 @@
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
+				7B1A2C3D4E5F6071829304B5 /* Mecab-Swift */,
+				7B1A2C3D4E5F6071829304B2 /* mlx-swift */,
+				7B1A2C3D4E5F6071829304A5 /* XCRemoteSwiftPackageReference "speech-swift" */,
 				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */,
 			);
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
@@ -350,6 +390,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B1A2C3D4E5F6071829304C1 /* VoiceAssets in Resources */,
 				97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */,
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
@@ -402,6 +443,18 @@
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
+		7B1A2C3D4E5F6071829304C2 /* Prepare Voice Metal */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/../scripts/build-ios-voice-metal.py",);
+			name = "Prepare Voice Metal";
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/mlx.metallib",);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "python3 \"$SRCROOT/../scripts/build-ios-voice-metal.py\"";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -425,6 +478,13 @@
 				A30C96F20542BA472AAFFFAB /* AudioCapture.swift in Sources */,
 				61B758B43B13EAF72A146188 /* Native.g.swift in Sources */,
 				5C110D08DC89E847D7AA405C /* PhrayoHost.swift in Sources */,
+				7B1A2C3D4E5F6071829304AB /* LocalTTS.swift in Sources */,
+				7B1A2C3D4E5F6071829304C4 /* VoiceAudioCache.swift in Sources */,
+				7B1A2C3D4E5F6071829304BF /* JapaneseSpeechText.swift in Sources */,
+				7B1A2C3D4E5F6071829304BD /* VoiceTextSegments.swift in Sources */,
+				7B1A2C3D4E5F6071829304BB /* VoiceModel.swift in Sources */,
+				7B1A2C3D4E5F6071829304B1 /* SpeechLanguage.swift in Sources */,
+				7B1A2C3D4E5F6071829304AD /* SpeechPlayback.swift in Sources */,
 				F0BC0E31D8153AD9AE5B519E /* RecordingAttributes.swift in Sources */,
 				2CCBF4BD8B6A9D9347C17854 /* RecordingIntents.swift in Sources */,
 				4F4FDDF233B155AF88B4C378 /* SonioxStream.swift in Sources */,
@@ -900,6 +960,27 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		7B1A2C3D4E5F6071829304A5 /* XCRemoteSwiftPackageReference "speech-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/soniqo/speech-swift.git";
+			requirement = {
+				kind = revision;
+				revision = d655076badd143f99c9ce19642fbea8b643ccc0b;
+			};
+		};
+		7B1A2C3D4E5F6071829304B2 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {kind = exactVersion; version = 0.31.4; };
+		};
+		7B1A2C3D4E5F6071829304B5 /* XCRemoteSwiftPackageReference "Mecab-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/shinjukunian/Mecab-Swift.git";
+			requirement = {kind = revision; revision = 1f096492e37fc05fc2e7304091f54889974c5368; };
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCLocalSwiftPackageReference section */
 		781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */ = {
 			isa = XCLocalSwiftPackageReference;
@@ -908,10 +989,18 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		7B1A2C3D4E5F6071829304A6 /* CosyVoiceTTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7B1A2C3D4E5F6071829304A5 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = CosyVoiceTTS;
+		};
 		78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
 		};
+		7B1A2C3D4E5F6071829304B3 /* MLX */ = {isa = XCSwiftPackageProductDependency; package = 7B1A2C3D4E5F6071829304B2; productName = "MLX"; };
+		7B1A2C3D4E5F6071829304B6 /* Mecab-Swift */ = {isa = XCSwiftPackageProductDependency; package = 7B1A2C3D4E5F6071829304B5; productName = "Mecab-Swift"; };
+		7B1A2C3D4E5F6071829304B8 /* IPADic */ = {isa = XCSwiftPackageProductDependency; package = 7B1A2C3D4E5F6071829304B5; productName = "IPADic"; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 97C146E61CF9000F007C117D /* Project object */;

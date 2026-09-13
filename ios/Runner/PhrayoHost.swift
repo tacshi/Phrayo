@@ -1,6 +1,7 @@
 import AVFoundation
 import ActivityKit
 import Flutter
+import OSLog
 import Security
 import Speech
 import SwiftUI
@@ -33,6 +34,11 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
   private let synthesizer = AVSpeechSynthesizer()
   private var player: AVAudioPlayer?
   private var playbackStop: Task<Void, Never>?
+  private let speechPlayback = SpeechPlayback()
+  private let speechPreparation = SpeechPlayback()
+  private var speechVoice = SpeechVoiceSelection()
+  private var ttsPreparationID: UUID?
+  private static let voiceLog = Logger(subsystem: "app.capyvibe.phrayo", category: "Playback")
   private var lastVoiced = 0.0, heardVoice = false
   private var lastActivityUpdate = 0.0
   private var pendingPermission = false
@@ -262,11 +268,15 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
               {
                 session?.error = "vocabulary_unavailable"
               }
-              let translated = try await AppleSpeech.translate(transcript, source, target)
-              session?.translation = translated
+              if !SpeechLanguage.needsTextTranslation(source: source, target: target) {
+                let translated = try await AppleSpeech.translate(transcript, source, target)
+                session?.translation = translated
+              }
             }
           }
-          if session?.translation.isEmpty == true, session?.transcript.isEmpty == false {
+          if session?.translation.isEmpty == true, session?.transcript.isEmpty == false,
+            !SpeechLanguage.needsTextTranslation(source: source, target: target)
+          {
             let text = session!.transcript
             let translated = try await AppleSpeech.translate(text, source, target)
             session?.translation = translated
@@ -419,8 +429,13 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     let installed =
       dictation
       ? await DictationTranscriber.installedLocales : await SpeechTranscriber.installedLocales
-    let status = await LanguageAvailability().status(
-      from: Locale.Language(identifier: source), to: Locale.Language(identifier: target))
+    let pair = try? await AppleSpeech.translationPair(source, target)
+    let status: LanguageAvailability.Status
+    if let pair {
+      status = await LanguageAvailability().status(from: pair.source, to: pair.target)
+    } else {
+      status = .unsupported
+    }
     let name: String
     switch status {
     case .installed: name = "installed"
@@ -438,7 +453,7 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
   }
   func prepareLanguages(source: String, target: String, transcriptionTerms: [String]) async throws {
     try await AppleSpeech.prepare(source, terms: transcriptionTerms)
-    if source != target {
+    if source != target, let pair = try? await AppleSpeech.translationPair(source, target) {
       try await withCheckedThrowingContinuation {
         (continuation: CheckedContinuation<Void, Error>) in
         guard let presenter = presenter() else {
@@ -446,7 +461,9 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
           return
         }
         var host: UIHostingController<PrepareTranslationView>?
-        let view = PrepareTranslationView(source: source, target: target) { error in
+        let view = PrepareTranslationView(
+          source: pair.source.minimalIdentifier, target: pair.target.minimalIdentifier
+        ) { error in
           host?.dismiss(animated: true)
           if let error { continuation.resume(throwing: error) } else { continuation.resume() }
         }
@@ -456,16 +473,111 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
       }
     }
   }
-  func speak(text: String, language: String) throws {
+  func ttsStatus(language: String) async throws -> String {
+    LocalTTSService.shared.status(language: language)
+  }
+  func prepareTts(languages: [String]) async throws {
+    let id = UUID()
+    ttsPreparationID = id
+    do {
+      try await LocalTTSService.shared.prepare(languages: languages) { [weak self] fraction in
+        Task { @MainActor [weak self] in
+          guard let self, self.ttsPreparationID == id else { return }
+          try? await self.events?.ttsProgress(fraction: fraction)
+        }
+      }
+      if ttsPreparationID == id {
+        ttsPreparationID = nil
+        try? await events?.ttsProgress(fraction: nil)
+      }
+    } catch {
+      if ttsPreparationID == id {
+        ttsPreparationID = nil
+        try? await events?.ttsProgress(fraction: nil)
+      }
+      Self.voiceLog.error(
+        "Voice preparation failed: \(String(describing: error), privacy: .private)")
+      if error is CancellationError { return }
+      throw appError("tts_install_failed")
+    }
+  }
+  func cancelTts() async throws { await LocalTTSService.shared.cancelPreparation() }
+  func previewTts(language: String, neural: Bool) async throws {
+    try await playSpeech(text: LocalTTSService.sample(language), language: language, neural: neural)
+  }
+  func speak(text: String, language: String) async throws {
+    try await playSpeech(
+      text: text, language: language,
+      neural: speechVoice.usesNeural(
+        text: text, language: language,
+        installed: LocalTTSService.shared.hasResources(for: language)))
+  }
+  func prepareSpeech(text: String, language: String) async throws {
+    speechPreparation.cancel()
+    guard !isActive, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    guard speechVoice.prepare(
+      text: text, language: language,
+      installed: LocalTTSService.shared.hasResources(for: language)) else { return }
+    do {
+      try await speechPreparation.run {
+        try await LocalTTSService.shared.synthesizeWAV(text: text, language: language)
+      } play: { _ in }
+    } catch {
+      Self.voiceLog.error(
+        "Speech preparation failed: \(String(describing: error), privacy: .private)")
+      throw appError(error is JapaneseReadingError ? "japanese_reading_missing" : "tts_failure")
+    }
+  }
+  func cancelSpeechPreparation() {
+    speechPreparation.cancel()
+    speechVoice.clear()
+  }
+  private func playSpeech(text: String, language: String, neural: Bool) async throws {
     guard !isActive else { throw appError("recording_active") }
     try stopPlayback()
+    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+    if neural {
+      do {
+        try await speechPlayback.run {
+          try await LocalTTSService.shared.synthesizeWAV(text: text, language: language)
+        } play: { wav in
+          guard !self.isActive else { return }
+          try self.activatePlayback()
+          let player = try AVAudioPlayer(data: wav)
+          self.player = player
+          player.delegate = self
+          guard player.play() else { throw appError("tts_failure") }
+        }
+      } catch {
+        deactivatePlaybackIfIdle()
+        Self.voiceLog.error(
+          "Neural playback failed: \(String(describing: error), privacy: .private)")
+        throw appError(error is JapaneseReadingError ? "japanese_reading_missing" : "tts_failure")
+      }
+    } else {
+      try activatePlayback()
+      do { try systemSpeak(text: text, language: language) } catch {
+        deactivatePlaybackIfIdle()
+        throw error
+      }
+    }
+  }
+  private func activatePlayback() throws {
     try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
     try AVAudioSession.sharedInstance().setActive(true)
-    guard
-      let voice = AVSpeechSynthesisVoice(language: language)
-        ?? AVSpeechSynthesisVoice.speechVoices().first(where: {
-          $0.language.split(separator: "-").first == language.split(separator: "-").first
-        })
+  }
+  private func systemSpeak(text: String, language: String) throws {
+    guard !isActive else { throw appError("recording_active") }
+    let voices = AVSpeechSynthesisVoice.speechVoices().filter {
+      SpeechLanguage.isCantonese(language)
+        ? SpeechLanguage.isCantonese($0.language)
+        : $0.language.split(separator: "-").first == language.split(separator: "-").first
+    }.sorted {
+      if $0.language == language, $1.language != language { return true }
+      if $1.language == language, $0.language != language { return false }
+      return $0.quality.rawValue > $1.quality.rawValue
+    }
+    guard let voice = voices.first
     else {
       throw appError("voice_missing")
     }
@@ -495,8 +607,12 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     }
   }
   func stopPlayback() throws {
+    speechPreparation.cancel()
+    speechPlayback.cancel()
     playbackStop?.cancel()
+    playbackStop = nil
     player?.stop()
+    player = nil
     synthesizer.stopSpeaking(at: .immediate)
     deactivatePlaybackIfIdle()
   }

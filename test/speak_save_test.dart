@@ -8,12 +8,14 @@ import 'package:phrayo/data/database.dart';
 import 'package:phrayo/services/platform.dart';
 import 'package:phrayo/ui/speak_page.dart';
 
+import 'support/ready_speech_native.dart';
+
 void main() {
   testWidgets(
     'bookmark reflects saved expression and resets for new content or deletion',
     (tester) async {
       final db = AppDatabase(NativeDatabase.memory());
-      final native = NativeBridge();
+      final native = NativeBridge(api: ReadySpeechNative());
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -77,7 +79,7 @@ void main() {
 
   testWidgets('a new recording clears the previous result', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
-    final native = NativeBridge();
+    final native = NativeBridge(api: ReadySpeechNative());
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -114,7 +116,13 @@ void main() {
     }
 
     await emit(
-      session('one', 'shortcut', 'saved', transcript: '你好', translation: 'Hello.'),
+      session(
+        'one',
+        'shortcut',
+        'saved',
+        transcript: '你好',
+        translation: 'Hello.',
+      ),
     );
     expect(find.text('你好'), findsOneWidget);
     expect(find.text('Hello.'), findsOneWidget);
@@ -124,7 +132,13 @@ void main() {
     expect(find.text('Hello.'), findsNothing);
 
     await emit(
-      session('two', 'shortcut', 'saved', transcript: '你好', translation: 'Hello.'),
+      session(
+        'two',
+        'shortcut',
+        'saved',
+        transcript: '你好',
+        translation: 'Hello.',
+      ),
     );
     expect(find.text('你好'), findsOneWidget);
     expect(find.text('Hello.'), findsOneWidget);

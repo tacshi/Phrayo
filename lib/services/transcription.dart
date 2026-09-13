@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 
 import '../core/models.dart';
+import '../core/languages.dart';
 import '../data/database.dart';
 import 'platform.dart';
 import 'moss.dart';
@@ -267,9 +268,16 @@ class TranscriptionService {
               'client_reference_id': job['reference'],
               'enable_speaker_diarization': true,
               'enable_language_identification': true,
-              'language_hints': [recording.sourceLanguage.split('-').first],
-              if ((job['transcriptionTerms'] as List? ?? const []).isNotEmpty)
-                'context': {'terms': job['transcriptionTerms']},
+              'language_hints': [sonioxLanguageCode(recording.sourceLanguage)],
+              if (sonioxContext(
+                recording.sourceLanguage,
+                (job['transcriptionTerms'] as List? ?? const []).cast<String>(),
+              ).isNotEmpty)
+                'context': sonioxContext(
+                  recording.sourceLanguage,
+                  (job['transcriptionTerms'] as List? ?? const [])
+                      .cast<String>(),
+                ),
             },
             cancelToken: cancellation,
           );

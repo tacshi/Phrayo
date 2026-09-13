@@ -459,7 +459,13 @@ protocol PhrayoNative {
   func transcribe(path: String, source: String, transcriptionTerms: [String]) async throws -> [SegmentMessage]
   func capabilities(source: String, target: String, transcriptionTerms: [String]) async throws -> CapabilityMessage
   func prepareLanguages(source: String, target: String, transcriptionTerms: [String]) async throws
-  func speak(text: String, language: String) throws
+  func prepareTts(languages: [String]) async throws
+  func ttsStatus(language: String) async throws -> String
+  func cancelTts() async throws
+  func previewTts(language: String, neural: Bool) async throws
+  func prepareSpeech(text: String, language: String) async throws
+  func cancelSpeechPreparation() throws
+  func speak(text: String, language: String) async throws
   func play(path: String, start: Double, end: Double?) throws
   func stopPlayback() throws
   func saveSecret(service: String, value: String) throws
@@ -677,17 +683,117 @@ class PhrayoNativeSetup {
     } else {
       prepareLanguagesChannel.setMessageHandler(nil)
     }
+    let prepareTtsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.phrayo.PhrayoNative.prepareTts\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      prepareTtsChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let languagesArg = args[0] as! [String]
+        Task { @MainActor in
+          do {
+            try await api.prepareTts(languages: languagesArg)
+            reply(wrapResult(nil))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      prepareTtsChannel.setMessageHandler(nil)
+    }
+    let ttsStatusChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.phrayo.PhrayoNative.ttsStatus\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      ttsStatusChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let languageArg = args[0] as! String
+        Task { @MainActor in
+          do {
+            let result = try await api.ttsStatus(language: languageArg)
+            reply(wrapResult(result))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      ttsStatusChannel.setMessageHandler(nil)
+    }
+    let cancelTtsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.phrayo.PhrayoNative.cancelTts\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      cancelTtsChannel.setMessageHandler { _, reply in
+        Task { @MainActor in
+          do {
+            try await api.cancelTts()
+            reply(wrapResult(nil))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      cancelTtsChannel.setMessageHandler(nil)
+    }
+    let previewTtsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.phrayo.PhrayoNative.previewTts\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      previewTtsChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let languageArg = args[0] as! String
+        let neuralArg = args[1] as! Bool
+        Task { @MainActor in
+          do {
+            try await api.previewTts(language: languageArg, neural: neuralArg)
+            reply(wrapResult(nil))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      previewTtsChannel.setMessageHandler(nil)
+    }
+    let prepareSpeechChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.phrayo.PhrayoNative.prepareSpeech\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      prepareSpeechChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let textArg = args[0] as! String
+        let languageArg = args[1] as! String
+        Task { @MainActor in
+          do {
+            try await api.prepareSpeech(text: textArg, language: languageArg)
+            reply(wrapResult(nil))
+          } catch {
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      prepareSpeechChannel.setMessageHandler(nil)
+    }
+    let cancelSpeechPreparationChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.phrayo.PhrayoNative.cancelSpeechPreparation\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      cancelSpeechPreparationChannel.setMessageHandler { _, reply in
+        do {
+          try api.cancelSpeechPreparation()
+          reply(wrapResult(nil))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      cancelSpeechPreparationChannel.setMessageHandler(nil)
+    }
     let speakChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.phrayo.PhrayoNative.speak\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
       speakChannel.setMessageHandler { message, reply in
         let args = message as! [Any?]
         let textArg = args[0] as! String
         let languageArg = args[1] as! String
-        do {
-          try api.speak(text: textArg, language: languageArg)
-          reply(wrapResult(nil))
-        } catch {
-          reply(wrapError(error))
+        Task { @MainActor in
+          do {
+            try await api.speak(text: textArg, language: languageArg)
+            reply(wrapResult(nil))
+          } catch {
+            reply(wrapError(error))
+          }
         }
       }
     } else {
@@ -857,9 +963,12 @@ class PhrayoNativeSetup {
 }
 
 /// Generated protocol from Pigeon that represents Flutter messages that can be called from Swift.
+@MainActor
 protocol PhrayoEventsProtocol {
   func sessionChanged(session sessionArg: SessionMessage) async throws
+  func ttsProgress(fraction fractionArg: Double?) async throws
 }
+@MainActor
 class PhrayoEvents: PhrayoEventsProtocol {
   private let binaryMessenger: FlutterBinaryMessenger
   private let messageChannelSuffix: String
@@ -875,6 +984,26 @@ class PhrayoEvents: PhrayoEventsProtocol {
       let channelName: String = "dev.flutter.pigeon.phrayo.PhrayoEvents.sessionChanged\(messageChannelSuffix)"
       let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
       channel.sendMessage([sessionArg] as [Any?]) { response in
+        guard let listResponse = response as? [Any?] else {
+          continuation.resume(throwing: createConnectionError(withChannelName: channelName))
+          return
+        }
+        if listResponse.count > 1 {
+          let code: String = listResponse[0] as! String
+          let message: String? = nilOrValue(listResponse[1])
+          let details: String? = nilOrValue(listResponse[2])
+          continuation.resume(throwing: PigeonError(code: code, message: message, details: details))
+        } else {
+          continuation.resume()
+        }
+      }
+    }
+  }
+  func ttsProgress(fraction fractionArg: Double?) async throws {
+    return try await withCheckedThrowingContinuation { continuation in
+      let channelName: String = "dev.flutter.pigeon.phrayo.PhrayoEvents.ttsProgress\(messageChannelSuffix)"
+      let channel = FlutterBasicMessageChannel(name: channelName, binaryMessenger: binaryMessenger, codec: codec)
+      channel.sendMessage([fractionArg] as [Any?]) { response in
         guard let listResponse = response as? [Any?] else {
           continuation.resume(throwing: createConnectionError(withChannelName: channelName))
           return

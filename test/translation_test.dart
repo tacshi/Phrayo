@@ -15,7 +15,9 @@ import 'package:phrayo/services/text_processor.dart';
 import 'package:phrayo/services/transcription.dart';
 import 'package:phrayo/ui/recordings_page.dart';
 
-class TranslationNative extends PhrayoNative {
+import 'support/ready_speech_native.dart';
+
+class TranslationNative extends ReadySpeechNative {
   final requests = <(String, String, String)>[];
   Completer<String>? pending;
   List<SessionMessage> recovered = [];

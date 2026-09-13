@@ -10,9 +10,9 @@ import 'package:flutter/services.dart';
 import 'package:meta/meta.dart' show immutable, protected, visibleForTesting;
 
 Object? _extractReplyValueOrThrow(
-    List<Object?>? replyList,
-    String channelName, {
-    required bool isNullValid,
+  List<Object?>? replyList,
+  String channelName, {
+  required bool isNullValid,
 }) {
   if (replyList == null) {
     throw PlatformException(
@@ -34,8 +34,11 @@ Object? _extractReplyValueOrThrow(
   return replyList.firstOrNull;
 }
 
-
-List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty = false}) {
+List<Object?> wrapResponse({
+  Object? result,
+  PlatformException? error,
+  bool empty = false,
+}) {
   if (empty) {
     return <Object?>[];
   }
@@ -44,6 +47,7 @@ List<Object?> wrapResponse({Object? result, PlatformException? error, bool empty
   }
   return <Object?>[error.code, error.message, error.details];
 }
+
 bool _deepEquals(Object? a, Object? b) {
   if (identical(a, b)) {
     return true;
@@ -56,8 +60,9 @@ bool _deepEquals(Object? a, Object? b) {
   }
   if (a is List && b is List) {
     return a.length == b.length &&
-        a.indexed
-            .every(((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]));
+        a.indexed.every(
+          ((int, dynamic) item) => _deepEquals(item.$2, b[item.$1]),
+        );
   }
   if (a is Map && b is Map) {
     if (a.length != b.length) {
@@ -106,7 +111,6 @@ int _deepHash(Object? value) {
   return value.hashCode;
 }
 
-
 class SegmentMessage {
   SegmentMessage({
     required this.id,
@@ -127,17 +131,12 @@ class SegmentMessage {
   String? speaker;
 
   List<Object?> _toList() {
-    return <Object?>[
-      id,
-      text,
-      start,
-      end,
-      speaker,
-    ];
+    return <Object?>[id, text, start, end, speaker];
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static SegmentMessage decode(Object result) {
     result as List<Object?>;
@@ -159,7 +158,11 @@ class SegmentMessage {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(id, other.id) && _deepEquals(text, other.text) && _deepEquals(start, other.start) && _deepEquals(end, other.end) && _deepEquals(speaker, other.speaker);
+    return _deepEquals(id, other.id) &&
+        _deepEquals(text, other.text) &&
+        _deepEquals(start, other.start) &&
+        _deepEquals(end, other.end) &&
+        _deepEquals(speaker, other.speaker);
   }
 
   @override
@@ -234,7 +237,8 @@ class SessionMessage {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static SessionMessage decode(Object result) {
     result as List<Object?>;
@@ -264,7 +268,19 @@ class SessionMessage {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(sttJobJson, other.sttJobJson) && _deepEquals(sourceLanguage, other.sourceLanguage) && _deepEquals(targetLanguage, other.targetLanguage) && _deepEquals(id, other.id) && _deepEquals(kind, other.kind) && _deepEquals(state, other.state) && _deepEquals(seconds, other.seconds) && _deepEquals(level, other.level) && _deepEquals(transcript, other.transcript) && _deepEquals(translation, other.translation) && _deepEquals(path, other.path) && _deepEquals(error, other.error) && _deepEquals(segments, other.segments);
+    return _deepEquals(sttJobJson, other.sttJobJson) &&
+        _deepEquals(sourceLanguage, other.sourceLanguage) &&
+        _deepEquals(targetLanguage, other.targetLanguage) &&
+        _deepEquals(id, other.id) &&
+        _deepEquals(kind, other.kind) &&
+        _deepEquals(state, other.state) &&
+        _deepEquals(seconds, other.seconds) &&
+        _deepEquals(level, other.level) &&
+        _deepEquals(transcript, other.transcript) &&
+        _deepEquals(translation, other.translation) &&
+        _deepEquals(path, other.path) &&
+        _deepEquals(error, other.error) &&
+        _deepEquals(segments, other.segments);
   }
 
   @override
@@ -311,7 +327,8 @@ class CapabilityMessage {
   }
 
   Object encode() {
-    return _toList();  }
+    return _toList();
+  }
 
   static CapabilityMessage decode(Object result) {
     result as List<Object?>;
@@ -334,7 +351,12 @@ class CapabilityMessage {
     if (identical(this, other)) {
       return true;
     }
-    return _deepEquals(speechStatus, other.speechStatus) && _deepEquals(vocabularySupported, other.vocabularySupported) && _deepEquals(speechLanguages, other.speechLanguages) && _deepEquals(installedSpeechLanguages, other.installedSpeechLanguages) && _deepEquals(voices, other.voices) && _deepEquals(translationStatus, other.translationStatus);
+    return _deepEquals(speechStatus, other.speechStatus) &&
+        _deepEquals(vocabularySupported, other.vocabularySupported) &&
+        _deepEquals(speechLanguages, other.speechLanguages) &&
+        _deepEquals(installedSpeechLanguages, other.installedSpeechLanguages) &&
+        _deepEquals(voices, other.voices) &&
+        _deepEquals(translationStatus, other.translationStatus);
   }
 
   @override
@@ -347,7 +369,6 @@ class CapabilityMessage {
   }
 }
 
-
 class _PigeonCodec extends StandardMessageCodec {
   const _PigeonCodec();
   @override
@@ -355,13 +376,13 @@ class _PigeonCodec extends StandardMessageCodec {
     if (value is int) {
       buffer.putUint8(4);
       buffer.putInt64(value);
-    }    else if (value is SegmentMessage) {
+    } else if (value is SegmentMessage) {
       buffer.putUint8(129);
       writeValue(buffer, value.encode());
-    }    else if (value is SessionMessage) {
+    } else if (value is SessionMessage) {
       buffer.putUint8(130);
       writeValue(buffer, value.encode());
-    }    else if (value is CapabilityMessage) {
+    } else if (value is CapabilityMessage) {
       buffer.putUint8(131);
       writeValue(buffer, value.encode());
     } else {
@@ -388,36 +409,57 @@ class PhrayoNative {
   /// Constructor for [PhrayoNative]. The [binaryMessenger] named argument is
   /// available for dependency injection. If it is left null, the default
   /// BinaryMessenger will be used which routes to the host platform.
-  PhrayoNative({BinaryMessenger? binaryMessenger, String messageChannelSuffix = ''})
-      : pigeonVar_binaryMessenger = binaryMessenger,
-        pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  PhrayoNative({
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) : pigeonVar_binaryMessenger = binaryMessenger,
+       pigeonVar_messageChannelSuffix = messageChannelSuffix.isNotEmpty
+           ? '.$messageChannelSuffix'
+           : '';
   final BinaryMessenger? pigeonVar_binaryMessenger;
 
   static const MessageCodec<Object?> pigeonChannelCodec = _PigeonCodec();
 
   final String pigeonVar_messageChannelSuffix;
 
-  Future<SessionMessage> start(String kind, String source, String target, bool localOnly, String sttProvider, List<String> transcriptionTerms) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.start$pigeonVar_messageChannelSuffix';
+  Future<SessionMessage> start(
+    String kind,
+    String source,
+    String target,
+    bool localOnly,
+    String sttProvider,
+    List<String> transcriptionTerms,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.start$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[kind, source, target, localOnly, sttProvider, transcriptionTerms]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[
+        kind,
+        source,
+        target,
+        localOnly,
+        sttProvider,
+        transcriptionTerms,
+      ],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as SessionMessage;
   }
 
   Future<SessionMessage> stop() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.stop$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.stop$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -427,16 +469,16 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as SessionMessage;
   }
 
   Future<void> pause() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.pause$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.pause$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -446,15 +488,15 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> resume() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.resume$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.resume$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -464,15 +506,15 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> cancel() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.cancel$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.cancel$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -482,15 +524,15 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<SessionMessage?> snapshot() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.snapshot$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.snapshot$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -500,16 +542,16 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
     return pigeonVar_replyValue as SessionMessage?;
   }
 
   Future<List<SessionMessage>> recover() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.recover$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.recover$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -519,145 +561,172 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return (pigeonVar_replyValue! as List<Object?>).cast<SessionMessage>();
   }
 
   Future<void> acknowledge(String id) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.acknowledge$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.acknowledge$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[id]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[id],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<String> translate(String text, String source, String target) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.translate$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.translate$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[text, source, target]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[text, source, target],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as String;
   }
 
-  Future<List<SegmentMessage>> transcribe(String path, String source, List<String> transcriptionTerms) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.transcribe$pigeonVar_messageChannelSuffix';
+  Future<List<SegmentMessage>> transcribe(
+    String path,
+    String source,
+    List<String> transcriptionTerms,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.transcribe$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[path, source, transcriptionTerms]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[path, source, transcriptionTerms],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return (pigeonVar_replyValue! as List<Object?>).cast<SegmentMessage>();
   }
 
-  Future<CapabilityMessage> capabilities(String source, String target, List<String> transcriptionTerms) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.capabilities$pigeonVar_messageChannelSuffix';
+  Future<CapabilityMessage> capabilities(
+    String source,
+    String target,
+    List<String> transcriptionTerms,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.capabilities$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[source, target, transcriptionTerms]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[source, target, transcriptionTerms],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as CapabilityMessage;
   }
 
-  Future<void> prepareLanguages(String source, String target, List<String> transcriptionTerms) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.prepareLanguages$pigeonVar_messageChannelSuffix';
+  Future<void> prepareLanguages(
+    String source,
+    String target,
+    List<String> transcriptionTerms,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.prepareLanguages$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[source, target, transcriptionTerms]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[source, target, transcriptionTerms],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
-  Future<void> speak(String text, String language) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.speak$pigeonVar_messageChannelSuffix';
+  Future<void> prepareTts(List<String> languages) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.prepareTts$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[text, language]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[languages],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
-  Future<void> play(String path, double start, double? end) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.play$pigeonVar_messageChannelSuffix';
+  Future<String> ttsStatus(String language) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.ttsStatus$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[path, start, end]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[language],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
-    _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
+    return pigeonVar_replyValue! as String;
   }
 
-  Future<void> stopPlayback() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.stopPlayback$pigeonVar_messageChannelSuffix';
+  Future<void> cancelTts() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.cancelTts$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -667,143 +736,279 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<void> previewTts(String language, bool neural) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.previewTts$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[language, neural],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<void> prepareSpeech(String text, String language) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.prepareSpeech$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[text, language],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<void> cancelSpeechPreparation() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.cancelSpeechPreparation$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<void> speak(String text, String language) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.speak$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[text, language],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<void> play(String path, double start, double? end) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.play$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[path, start, end],
+    );
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
+  }
+
+  Future<void> stopPlayback() async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.stopPlayback$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    _extractReplyValueOrThrow(
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> saveSecret(String service, String value) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.saveSecret$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.saveSecret$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[service, value]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[service, value],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<String?> readSecret(String service) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.readSecret$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.readSecret$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[service]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[service],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
     return pigeonVar_replyValue as String?;
   }
 
-  Future<void> configure(String source, String target, bool localOnly, String sttProvider, List<String> transcriptionTerms) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.configure$pigeonVar_messageChannelSuffix';
+  Future<void> configure(
+    String source,
+    String target,
+    bool localOnly,
+    String sttProvider,
+    List<String> transcriptionTerms,
+  ) async {
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.configure$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[source, target, localOnly, sttProvider, transcriptionTerms]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[source, target, localOnly, sttProvider, transcriptionTerms],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> share(String text, String? path) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.share$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.share$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[text, path]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[text, path],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<String> prepareAudio(String path) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.prepareAudio$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.prepareAudio$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[path]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[path],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: false,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: false,
+    );
     return pigeonVar_replyValue! as String;
   }
 
   Future<void> shareRecordings(List<String> paths) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.shareRecordings$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.shareRecordings$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[paths]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[paths],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> deleteAudio(String path) async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.deleteAudio$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.deleteAudio$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
       binaryMessenger: pigeonVar_binaryMessenger,
     );
-    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(<Object?>[path]);
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(
+      <Object?>[path],
+    );
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 
   Future<void> openSettings() async {
-    final pigeonVar_channelName = 'dev.flutter.pigeon.phrayo.PhrayoNative.openSettings$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channelName =
+        'dev.flutter.pigeon.phrayo.PhrayoNative.openSettings$pigeonVar_messageChannelSuffix';
     final pigeonVar_channel = BasicMessageChannel<Object?>(
       pigeonVar_channelName,
       pigeonChannelCodec,
@@ -813,11 +1018,10 @@ class PhrayoNative {
     final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
 
     _extractReplyValueOrThrow(
-        pigeonVar_replyList,
-        pigeonVar_channelName,
-        isNullValid: true,
-    )
-    ;
+      pigeonVar_replyList,
+      pigeonVar_channelName,
+      isNullValid: true,
+    );
   }
 }
 
@@ -826,12 +1030,22 @@ abstract class PhrayoEvents {
 
   void sessionChanged(SessionMessage session);
 
-  static void setUp(PhrayoEvents? api, {BinaryMessenger? binaryMessenger, String messageChannelSuffix = '',}) {
-    messageChannelSuffix = messageChannelSuffix.isNotEmpty ? '.$messageChannelSuffix' : '';
+  void ttsProgress(double? fraction);
+
+  static void setUp(
+    PhrayoEvents? api, {
+    BinaryMessenger? binaryMessenger,
+    String messageChannelSuffix = '',
+  }) {
+    messageChannelSuffix = messageChannelSuffix.isNotEmpty
+        ? '.$messageChannelSuffix'
+        : '';
     {
       final pigeonVar_channel = BasicMessageChannel<Object?>(
-          'dev.flutter.pigeon.phrayo.PhrayoEvents.sessionChanged$messageChannelSuffix', pigeonChannelCodec,
-          binaryMessenger: binaryMessenger);
+        'dev.flutter.pigeon.phrayo.PhrayoEvents.sessionChanged$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
       if (api == null) {
         pigeonVar_channel.setMessageHandler(null);
       } else {
@@ -843,8 +1057,35 @@ abstract class PhrayoEvents {
             return wrapResponse(empty: true);
           } on PlatformException catch (e) {
             return wrapResponse(error: e);
-          }          catch (e) {
-            return wrapResponse(error: PlatformException(code: 'error', message: e.toString()));
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
+          }
+        });
+      }
+    }
+    {
+      final pigeonVar_channel = BasicMessageChannel<Object?>(
+        'dev.flutter.pigeon.phrayo.PhrayoEvents.ttsProgress$messageChannelSuffix',
+        pigeonChannelCodec,
+        binaryMessenger: binaryMessenger,
+      );
+      if (api == null) {
+        pigeonVar_channel.setMessageHandler(null);
+      } else {
+        pigeonVar_channel.setMessageHandler((Object? message) async {
+          final List<Object?> args = message! as List<Object?>;
+          final double? arg_fraction = args[0] as double?;
+          try {
+            api.ttsProgress(arg_fraction);
+            return wrapResponse(empty: true);
+          } on PlatformException catch (e) {
+            return wrapResponse(error: e);
+          } catch (e) {
+            return wrapResponse(
+              error: PlatformException(code: 'error', message: e.toString()),
+            );
           }
         });
       }

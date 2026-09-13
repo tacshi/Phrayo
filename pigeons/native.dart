@@ -1,3 +1,4 @@
+// Regenerate with bash scripts/generate-native.sh to preserve Swift event isolation.
 import 'package:pigeon/pigeon.dart';
 
 @ConfigurePigeon(
@@ -94,11 +95,35 @@ abstract class PhrayoNative {
   @async
   String translate(String text, String source, String target);
   @async
-  List<SegmentMessage> transcribe(String path, String source, List<String> transcriptionTerms);
+  List<SegmentMessage> transcribe(
+    String path,
+    String source,
+    List<String> transcriptionTerms,
+  );
   @async
-  CapabilityMessage capabilities(String source, String target, List<String> transcriptionTerms);
+  CapabilityMessage capabilities(
+    String source,
+    String target,
+    List<String> transcriptionTerms,
+  );
   @async
-  void prepareLanguages(String source, String target, List<String> transcriptionTerms);
+  void prepareLanguages(
+    String source,
+    String target,
+    List<String> transcriptionTerms,
+  );
+  @async
+  void prepareTts(List<String> languages);
+  @async
+  String ttsStatus(String language);
+  @async
+  void cancelTts();
+  @async
+  void previewTts(String language, bool neural);
+  @async
+  void prepareSpeech(String text, String language);
+  void cancelSpeechPreparation();
+  @async
   void speak(String text, String language);
   void play(String path, double start, double? end);
   void stopPlayback();
@@ -124,4 +149,5 @@ abstract class PhrayoNative {
 @FlutterApi()
 abstract class PhrayoEvents {
   void sessionChanged(SessionMessage session);
+  void ttsProgress(double? fraction);
 }
