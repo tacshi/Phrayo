@@ -7,6 +7,7 @@
 .atom/
 .build/
 .buildlog/
+/.brooks-lint-history.json
 .history
 .svn/
 .swiftpm/
