@@ -30,6 +30,8 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
   private var transcriptionTerms = [String]()
   private var mossJob: [String: Any]?
   private var stopTask: Task<SessionMessage, Error>?
+  private var recordingDrain = RecordingDrain()
+  private var cancelling = false
   private var activity: Activity<RecordingAttributes>?
   private let synthesizer = AVSpeechSynthesizer()
   private var player: AVAudioPlayer?
@@ -79,6 +81,7 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     async throws
     -> SessionMessage
   {
+    guard !cancelling else { throw appError("recording_active") }
     if isActive, let session {
       guard session.state != "processing",
         session.kind == kind
@@ -107,6 +110,7 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     self.transcriptionTerms = try TranscriptionVocabulary.normalize(transcriptionTerms)
     mossJob = nil
     stopTask = nil
+    recordingDrain = RecordingDrain()
     receivedFirstBuffer = false
     lastVoiced = 0
     heardVoice = false
@@ -146,7 +150,9 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
         cloud = SonioxStream(
           key: key, source: source, target: target, terms: self.transcriptionTerms)
         cloud?.onText = { [weak self] text, translation, segments in
-          guard let self, self.session?.id == id else { return }
+          guard let self, self.session?.id == id,
+            ["recording", "processing"].contains(self.session?.state ?? "")
+          else { return }
           self.session?.transcript = text
           self.session?.translation = translation
           self.session?.segments = segments
@@ -223,13 +229,17 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     if let stopTask { return try await stopTask.value }
     guard let current = session else { throw appError("no_recording") }
     guard current.state == "recording" || current.state == "paused" else { return current }
+    let drain = recordingDrain
     let task = Task { @MainActor () throws -> SessionMessage in
-      let urls = await capture?.finish() ?? []
-      packetContinuation?.finish()
-      await packetTask?.value
-      packetTask = nil
-      packetContinuation = nil
-      capture = nil
+      guard let urls = await drain.finish({ [self] in
+        let urls = await capture?.finish() ?? []
+        packetContinuation?.finish()
+        await packetTask?.value
+        packetTask = nil
+        packetContinuation = nil
+        capture = nil
+        return urls
+      }) else { return session ?? current }
       session?.state = "processing"
       session?.level = 0
       emit()
@@ -332,6 +342,9 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     emit()
   }
   func cancel() async throws {
+    guard !cancelling else { return }
+    cancelling = true
+    defer { cancelling = false }
     if stopTask != nil, session?.state == "processing", mossJob != nil {
       stopTask?.cancel()
       _ = try await stopTask?.value
@@ -342,6 +355,8 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     session?.state = "cancelled"
     cloud?.cancel()
     cloud = nil
+    await recordingDrain.discard()
+    _ = try await stopTask?.value
     if let capture { _ = await capture.finish() }
     capture = nil
     packetContinuation?.finish()
@@ -354,6 +369,13 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
     }
     session?.state = "cancelled"
     session?.level = 0
+    session?.transcript = ""
+    session?.translation = ""
+    session?.segments = []
+    session?.path = nil
+    session?.error = nil
+    session?.sttJobJson = nil
+    mossJob = nil
     stopTask = nil
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     emit()
@@ -820,7 +842,9 @@ final class PhrayoHost: NSObject, @preconcurrency PhrayoNative, AVSpeechSynthesi
   }
   private func preserveInterruption(_ code: String) async {
     guard session?.state == "recording" || session?.state == "paused" else { return }
+    let id = session?.id
     _ = try? await stop()
+    guard session?.id == id, session?.state != "cancelled" else { return }
     session?.state = "interrupted"
     session?.error = code
     try? journal()

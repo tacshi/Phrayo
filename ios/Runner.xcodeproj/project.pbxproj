@@ -37,6 +37,7 @@
 		F0BC0E31D8153AD9AE5B519E /* RecordingAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5DE8BC8E451FD6757C46A8D /* RecordingAttributes.swift */; };
 		FC3C62DE4F18D60EB6659042 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 0AFB275910FEF8EF7349E0DE /* Localizable.strings */; };
 		7B1A2C3D4E5F6071829304AD /* SpeechPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304AC /* SpeechPlayback.swift */; };
+		E483270F6A4D45719301CD02 /* RecordingDrain.swift in Sources */ = {isa = PBXBuildFile; fileRef = E483270F6A4D45719301CD01 /* RecordingDrain.swift */; };
 		7B1A2C3D4E5F6071829304B1 /* SpeechLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1A2C3D4E5F6071829304B0 /* SpeechLanguage.swift */; };
 		7B1A2C3D4E5F6071829304B4 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 7B1A2C3D4E5F6071829304B3; };
 		7B1A2C3D4E5F6071829304B7 /* Mecab-Swift in Frameworks */ = {isa = PBXBuildFile; productRef = 7B1A2C3D4E5F6071829304B6; };
@@ -128,6 +129,7 @@
 		ABB89664F4C8470284EEBC99 /* MossTranscription.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MossTranscription.swift; sourceTree = "<group>"; };
 		F4E96520D1C94CA64FB3E483 /* Native.g.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Native.g.swift; sourceTree = "<group>"; };
 		7B1A2C3D4E5F6071829304AC /* SpeechPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechPlayback.swift; sourceTree = "<group>"; };
+		E483270F6A4D45719301CD01 /* RecordingDrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDrain.swift; sourceTree = "<group>"; };
 		7B1A2C3D4E5F6071829304B0 /* SpeechLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechLanguage.swift; sourceTree = "<group>"; };
 		7B1A2C3D4E5F6071829304BA /* VoiceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModel.swift; sourceTree = "<group>"; };
 		7B1A2C3D4E5F6071829304BC /* VoiceTextSegments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceTextSegments.swift; sourceTree = "<group>"; };
@@ -235,6 +237,7 @@
 				7B1A2C3D4E5F6071829304BA /* VoiceModel.swift */,
 				7B1A2C3D4E5F6071829304B0 /* SpeechLanguage.swift */,
 				7B1A2C3D4E5F6071829304AC /* SpeechPlayback.swift */,
+				E483270F6A4D45719301CD01 /* RecordingDrain.swift */,
 				D5DE8BC8E451FD6757C46A8D /* RecordingAttributes.swift */,
 				CC8481ADFC77A856AE75AD1B /* RecordingIntents.swift */,
 				DA57B63FA3D7B89169BCEB23 /* SonioxStream.swift */,
@@ -485,6 +488,7 @@
 				7B1A2C3D4E5F6071829304BB /* VoiceModel.swift in Sources */,
 				7B1A2C3D4E5F6071829304B1 /* SpeechLanguage.swift in Sources */,
 				7B1A2C3D4E5F6071829304AD /* SpeechPlayback.swift in Sources */,
+				E483270F6A4D45719301CD02 /* RecordingDrain.swift in Sources */,
 				F0BC0E31D8153AD9AE5B519E /* RecordingAttributes.swift in Sources */,
 				2CCBF4BD8B6A9D9347C17854 /* RecordingIntents.swift in Sources */,
 				4F4FDDF233B155AF88B4C378 /* SonioxStream.swift in Sources */,

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
@@ -8,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../core/models.dart';
 import '../core/languages.dart';
 import '../core/providers.dart';
+import '../services/platform.dart';
 import 'common.dart';
 import 'library_page.dart';
 import 'strings.dart';
@@ -19,20 +21,86 @@ class SpeakPage extends ConsumerStatefulWidget {
   ConsumerState<SpeakPage> createState() => _SpeakPageState();
 }
 
+enum _RecordingEnd { finish, discard }
+
 class _SpeakPageState extends ConsumerState<SpeakPage> {
   final input = TextEditingController();
   String output = '', explanation = '';
   TranslationStyle style = TranslationStyle.standard;
   String? sessionId, audioPath, finalAppliedId, editedSessionId;
   int revision = 0;
-  bool busy = false, starting = false, pressed = false, saving = false;
+  bool busy = false, starting = false, saving = false, finishing = false;
   bool changingLanguage = false;
+  final cancelTarget = GlobalKey();
+  final microphoneTarget = GlobalKey();
+  final discardedSessions = <String>{};
+  late final NativeBridge native;
+  int? recordingPointer;
+  String? heldSessionId;
+  bool cancelArmed = false;
+  _RecordingEnd? pendingEnd;
   CancelToken? cancellation;
+
+  @override
+  void initState() {
+    super.initState();
+    native = ref.read(nativeProvider);
+  }
+
   @override
   void dispose() {
     cancellation?.cancel();
+    // A pending start handles its own cleanup once its session ID is known.
+    if (!starting && !finishing && heldSessionId != null) {
+      unawaited(discardOwnedSession(heldSessionId!));
+    }
+    resetGesture();
     input.dispose();
     super.dispose();
+  }
+
+  Future<void> discardOwnedSession(String id) async {
+    try {
+      final current = await native.api.snapshot();
+      if (current?.id == id && current?.state == 'recording') {
+        await native.api.cancel();
+      }
+    } catch (_) {
+      // The page is gone; native recovery retains any unfinished capture.
+    }
+  }
+
+  void resetGesture() {
+    recordingPointer = null;
+    cancelArmed = false;
+    pendingEnd = null;
+  }
+
+  bool overCancel(Offset position) {
+    final target = cancelTarget.currentContext?.findRenderObject();
+    final microphone = microphoneTarget.currentContext?.findRenderObject();
+    if (target is! RenderBox || microphone is! RenderBox) return false;
+    final bounds = (target.localToGlobal(Offset.zero) & target.size).inflate(8);
+    final microphoneTop = microphone.localToGlobal(Offset.zero).dy;
+    return position.dy < microphoneTop && bounds.contains(position);
+  }
+
+  void moveRecordingPointer(PointerEvent event) {
+    if (event.pointer != recordingPointer || pendingEnd != null || finishing) {
+      return;
+    }
+    final armed = overCancel(event.position);
+    if (armed == cancelArmed) return;
+    setState(() => cancelArmed = armed);
+    if (armed) unawaited(HapticFeedback.lightImpact());
+  }
+
+  void releaseRecordingPointer(PointerEvent event, {bool cancelled = false}) {
+    if (event.pointer != recordingPointer) return;
+    final discard = cancelled || overCancel(event.position);
+    unawaited(
+      endRecording(discard ? _RecordingEnd.discard : _RecordingEnd.finish),
+    );
   }
 
   void changed() {
@@ -48,24 +116,36 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
   }
 
   Future<void> start() async {
-    if (starting || changingLanguage) return;
+    if (starting || finishing || changingLanguage) return;
     setState(() => starting = true);
     revision++;
     cancellation?.cancel();
     final settings = ref.read(settingsProvider);
+    final previousSessionId = native.current?.id;
     try {
-      final session = await ref
-          .read(nativeProvider)
-          .api
-          .start(
-            'speaking',
-            settings.source,
-            settings.target,
-            settings.localOnly,
-            settings.sttProvider.name,
-            settings.transcriptionTerms,
-          );
-      if (!mounted) return;
+      final session = await native.api.start(
+        'speaking',
+        settings.source,
+        settings.target,
+        settings.localOnly,
+        settings.sttProvider.name,
+        settings.transcriptionTerms,
+      );
+      if (!mounted) {
+        await discardOwnedSession(session.id);
+        return;
+      }
+      final latest = native.current;
+      if (latest != null &&
+          latest.id != session.id &&
+          latest.id != previousSessionId) {
+        resetGesture();
+        heldSessionId = null;
+        return;
+      }
+      heldSessionId = session.id;
+      // Native events can arrive before the start reply.
+      final current = latest?.id == session.id ? latest! : session;
       setState(() {
         sessionId = session.id;
         finalAppliedId = null;
@@ -75,25 +155,107 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         output = '';
         explanation = '';
       });
-      ref.read(nativeProvider).sessionChanged(session);
-      if (!pressed) await stop();
+      native.sessionChanged(current);
+      if (current.state != 'recording') {
+        resetGesture();
+        heldSessionId = null;
+      }
     } catch (e) {
-      if (mounted) notice(context, errorKey(e));
+      if (mounted) {
+        setState(() {
+          resetGesture();
+          heldSessionId = null;
+        });
+        notice(context, errorKey(e));
+      }
     } finally {
       if (mounted) setState(() => starting = false);
     }
+    if (mounted && pendingEnd != null) await endRecording(pendingEnd!);
   }
 
-  Future<void> stop() async {
-    await action(context, () async {
-      final session = await ref.read(nativeProvider).api.stop();
-      ref.read(nativeProvider).sessionChanged(session);
+  Future<void> endRecording(_RecordingEnd end) async {
+    if (finishing) return;
+    setState(() {
+      recordingPointer = null;
+      cancelArmed = false;
+      pendingEnd = end;
     });
+    if (starting) return;
+    final current = native.current;
+    final id = heldSessionId ?? current?.id;
+    if (id == null ||
+        current?.id != id ||
+        current?.kind == 'recording' ||
+        current?.state != 'recording') {
+      setState(resetGesture);
+      return;
+    }
+    setState(() {
+      finishing = true;
+      pendingEnd = null;
+      if (end == _RecordingEnd.discard) {
+        discardedSessions.add(id);
+        clearRecordingDraft();
+      }
+    });
+    try {
+      if (end == _RecordingEnd.discard) {
+        await native.api.cancel();
+        final result = await native.api.snapshot();
+        if (!mounted) return;
+        if (result?.id == id) {
+          // Processing may have won the race and retained a recoverable job.
+          if (result!.state != 'cancelled') discardedSessions.remove(id);
+          native.sessionChanged(result);
+        }
+      } else {
+        final result = await native.api.stop();
+        if (mounted && native.current?.id == id) native.sessionChanged(result);
+      }
+    } catch (e) {
+      if (mounted) {
+        discardedSessions.remove(id);
+        final latest = native.current;
+        if (latest?.id == id) native.sessionChanged(latest!);
+        notice(
+          context,
+          end == _RecordingEnd.discard
+              ? 'cancel_recording_failed'
+              : errorKey(e),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          finishing = false;
+          heldSessionId =
+              native.current?.id == id && native.current?.state == 'recording'
+              ? id
+              : null;
+          resetGesture();
+        });
+      }
+    }
+  }
+
+  void clearRecordingDraft() {
+    revision++;
+    cancellation?.cancel();
+    input.clear();
+    output = '';
+    explanation = '';
+    audioPath = null;
+    finalAppliedId = null;
+    editedSessionId = null;
+    busy = false;
   }
 
   Future<void> translate() async {
     final text = input.text.trim();
-    if (text.isEmpty || busy || starting || changingLanguage) return;
+    if (text.isEmpty || busy || starting || finishing || changingLanguage) {
+      return;
+    }
     final generation = ++revision;
     cancellation?.cancel();
     final token = CancelToken();
@@ -198,7 +360,23 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         false;
     ref.listen(sessionProvider, (_, next) {
       next.whenData((s) {
-        if (s.kind == 'recording') return;
+        if (s.kind == 'recording' || discardedSessions.contains(s.id)) return;
+        if (s.state == 'cancelled') {
+          discardedSessions.add(s.id);
+          if (s.id == sessionId) {
+            setState(() {
+              clearRecordingDraft();
+              resetGesture();
+              heldSessionId = null;
+            });
+          }
+          return;
+        }
+        if (heldSessionId != null &&
+            (s.id != heldSessionId || s.state != 'recording')) {
+          resetGesture();
+          heldSessionId = null;
+        }
         final fresh = s.id != sessionId;
         if (!fresh && editedSessionId == s.id) return;
         if (fresh &&
@@ -263,13 +441,25 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         ref.read(nativeProvider).current;
     final recording =
         session != null &&
+        !discardedSessions.contains(session.id) &&
         session.kind != 'recording' &&
         session.state == 'recording';
-    final processing = session?.state == 'processing';
+    final processing =
+        session?.state == 'processing' &&
+        !discardedSessions.contains(session?.id);
     final languagesLocked =
         starting ||
+        finishing ||
         changingLanguage ||
         ['recording', 'paused', 'processing'].contains(session?.state);
+    final controlEnabled =
+        !busy &&
+        !finishing &&
+        !processing &&
+        !changingLanguage &&
+        !(session?.kind == 'recording' &&
+            ['recording', 'paused', 'processing'].contains(session?.state));
+    final showCancel = (recording || starting) && !finishing;
     final settings = ref.watch(settingsProvider);
     final colors = Theme.of(context).colorScheme;
     return LayoutBuilder(
@@ -314,7 +504,8 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                     controller: input,
                     minLines: 2,
                     maxLines: 6,
-                    enabled: !recording && !processing && !starting,
+                    enabled:
+                        !recording && !processing && !starting && !finishing,
                     decoration: InputDecoration(
                       labelText: tr(context, 'original'),
                       filled: false,
@@ -490,42 +681,109 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                         ),
                       ),
                     ),
+                  if (showCancel)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: SizedBox(
+                        key: cancelTarget,
+                        width: 240,
+                        child: Semantics(
+                          liveRegion: true,
+                          label: tr(
+                            context,
+                            cancelArmed ? 'release_to_cancel' : 'cancel',
+                          ),
+                          button: true,
+                          onTap: pendingEnd != null
+                              ? null
+                              : () => endRecording(_RecordingEnd.discard),
+                          child: ExcludeSemantics(
+                            child: TextButton(
+                              key: const ValueKey('speak-cancel'),
+                              onPressed: pendingEnd != null
+                                  ? null
+                                  : () {
+                                      if (recordingPointer == null) {
+                                        unawaited(
+                                          endRecording(_RecordingEnd.discard),
+                                        );
+                                      }
+                                    },
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                                foregroundColor: cancelArmed
+                                    ? colors.onErrorContainer
+                                    : colors.onSurfaceVariant,
+                                backgroundColor: cancelArmed
+                                    ? colors.errorContainer
+                                    : colors.surfaceContainerHighest,
+                              ),
+                              child: IndexedStack(
+                                index: cancelArmed ? 1 : 0,
+                                alignment: Alignment.center,
+                                children: [
+                                  Text(
+                                    tr(context, 'slide_up_to_cancel'),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  Text(
+                                    tr(context, 'release_to_cancel'),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   Center(
                     child: Semantics(
                       key: const ValueKey("speak-control"),
-                      enabled: !busy && !processing && !changingLanguage,
+                      enabled: controlEnabled && !starting,
                       button: true,
                       label: tr(context, recording ? 'stop' : 'start'),
-                      onTap: busy || processing || changingLanguage
+                      onTap:
+                          !controlEnabled ||
+                              starting ||
+                              recordingPointer != null
                           ? null
                           : () {
-                              pressed = true;
                               if (recording) {
-                                pressed = false;
-                                stop();
+                                endRecording(_RecordingEnd.finish);
                               } else {
+                                resetGesture();
                                 start();
                               }
                             },
                       child: ExcludeSemantics(
                         child: Listener(
-                          onPointerDown: busy || processing || changingLanguage
+                          behavior: HitTestBehavior.opaque,
+                          onPointerDown: !controlEnabled
                               ? null
-                              : (_) {
-                                  pressed = true;
-                                  start();
+                              : (event) {
+                                  if (starting ||
+                                      finishing ||
+                                      recordingPointer != null ||
+                                      pendingEnd != null) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    recordingPointer = event.pointer;
+                                    cancelArmed = false;
+                                  });
+                                  if (recording) {
+                                    heldSessionId = session.id;
+                                  } else {
+                                    start();
+                                  }
                                 },
-                          onPointerUp: (_) {
-                            if (!pressed) return;
-                            pressed = false;
-                            if (!starting) stop();
-                          },
-                          onPointerCancel: (_) {
-                            if (!pressed) return;
-                            pressed = false;
-                            if (!starting) stop();
-                          },
+                          onPointerMove: moveRecordingPointer,
+                          onPointerUp: releaseRecordingPointer,
+                          onPointerCancel: (event) =>
+                              releaseRecordingPointer(event, cancelled: true),
                           child: AnimatedContainer(
+                            key: microphoneTarget,
                             duration: MediaQuery.disableAnimationsOf(context)
                                 ? Duration.zero
                                 : const Duration(milliseconds: 120),
@@ -561,8 +819,13 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                       ),
                     ),
                   ),
-                  if (!recording && !processing && !starting)
-                    Padding(
+                  Visibility(
+                    visible:
+                        !recording && !processing && !starting && !finishing,
+                    maintainSize: true,
+                    maintainState: true,
+                    maintainAnimation: true,
+                    child: Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: ExcludeSemantics(
                         child: Text(
@@ -572,6 +835,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                         ),
                       ),
                     ),
+                  ),
                 ],
               ),
             ),

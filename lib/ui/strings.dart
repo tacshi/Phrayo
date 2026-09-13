@@ -136,6 +136,13 @@ const words = <String, List<String>>{
   'settings': ['Settings', '设置', '設定'],
   'start': ['Start speaking', '开始说话', '開始說話'],
   'hold_to_speak': ['Hold to speak', '按住说话', '按住說話'],
+  'slide_up_to_cancel': ['Slide up to cancel', '上滑取消', '上滑取消'],
+  'release_to_cancel': ['Release to cancel', '松开取消', '鬆開取消'],
+  'cancel_recording_failed': [
+    'Could not cancel. Try Cancel again.',
+    '未能取消，请再次点按取消。',
+    '未能取消，請再次點按取消。',
+  ],
   'stop': ['Stop', '结束', '結束'],
   'listening': ['Listening…', '正在聆听…', '正在聆聽…'],
   'processing': ['Processing…', '正在处理…', '正在處理…'],

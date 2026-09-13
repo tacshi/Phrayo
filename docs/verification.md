@@ -1,5 +1,14 @@
 # Verification — 2026-09-09
 
+## Slide up to cancel speaking — 2026-09-13
+
+- Added release-to-cancel above the held microphone, reversible hover highlighting, entry haptics, accessible Start/Stop/Cancel, and English/Simplified Chinese/Traditional Chinese instructions. The microphone remains stationary when capture starts.
+- Cancellation retains pointer/session ownership across delayed startup and cleanup. Cancelled session events cannot restore text or replace a newer session. Native cancellation during the automatic-stop drain prevents export/processing and drains capture once.
+- 38 focused Flutter tests passed across the recording-gesture, widget, retranslation, and speaking-language suites, including 23 gesture cases. Coverage includes startup/failure/retry/disposal, multi-touch, stale events, hit margins, accessibility activation, and narrow/compact layouts at 200% text scale. The existing layout fixture now supplies a voice-status response instead of leaving a platform timeout pending.
+- The four checks in `bash scripts/test-recording-native.sh` passed: cancellation during draining, cancellation before a queued stop, shared draining for ordinary/repeated stops, and independent ownership for the next recording. These use controlled capture completions, not microphone input.
+- Focused Dart analysis reported no issues. `flutter build ios --simulator --debug --no-pub` compiled the native guard and built the simulator app.
+- Physical iPhone finger movement, perceived haptics, microphone shutdown, and audio-file cleanup remain unverified. No physical-device installation or microphone capture was performed for this change.
+
 ## Executed
 
 - Flutter/Dart dependency resolution and Pigeon/Drift code generation.

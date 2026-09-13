@@ -21,6 +21,11 @@ class ChineseSettings extends SettingsController {
   AppSettings build() => const AppSettings(locale: 'zh-Hant');
 }
 
+class LayoutNative extends ReadySpeechNative {
+  @override
+  Future<String> ttsStatus(String language) async => 'unsupported';
+}
+
 class DelayedTranslation extends ReadySpeechNative {
   final pending = Completer<String>();
   @override
@@ -163,11 +168,13 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final bridge = NativeBridge(api: LayoutNative());
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             bootstrapProvider.overrideWith((ref) async {}),
             settingsProvider.overrideWith(ChineseSettings.new),
+            nativeProvider.overrideWithValue(bridge),
           ],
           child: const PhrayoApp(),
         ),
@@ -188,6 +195,7 @@ void main() {
       expect(tester.takeException(), null);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
+      await bridge.dispose();
     },
   );
   testWidgets('switching tabs preserves the speaking draft and translation', (

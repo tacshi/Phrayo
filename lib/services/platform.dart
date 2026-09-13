@@ -8,12 +8,15 @@ class NativeBridge implements PhrayoEvents {
   final ttsDownloads = StreamController<double?>.broadcast();
   Stream<double?> get ttsDownloadProgress => ttsDownloads.stream;
   SessionMessage? current;
+  final _cancelledSessions = <String>{};
   String? navigatedShortcutId;
   NativeBridge({PhrayoNative? api}) : api = api ?? PhrayoNative() {
     PhrayoEvents.setUp(this);
   }
   @override
   void sessionChanged(SessionMessage session) {
+    if (_cancelledSessions.contains(session.id)) return;
+    if (session.state == 'cancelled') _cancelledSessions.add(session.id);
     current = session;
     sessions.add(session);
   }
