@@ -28,6 +28,7 @@ end
  extension.source_build_phase.add_file_reference(file,true)
 end
 extension.build_configurations.each do |c|
+ c.base_configuration_reference=runner.build_configurations.find { |config| config.name==c.name }.base_configuration_reference
  c.build_settings['PRODUCT_NAME']='$(TARGET_NAME)'
  c.build_settings['INFOPLIST_FILE']='PhrayoActivity/Info.plist'
  c.build_settings['PRODUCT_BUNDLE_IDENTIFIER']='app.capyvibe.phrayo.liveactivity'

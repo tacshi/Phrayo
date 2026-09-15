@@ -1,5 +1,12 @@
 # Verification — 2026-09-09
 
+## Build and release scripts — 2026-09-15
+
+- Added APK build/install scripts and internal TestFlight publishing, adapted from 115Lab. Android builds stop before invoking tools because Phrayo has no Android project; existing APK installation is supported.
+- Bash syntax checks and 25 focused Python tests passed with fake Flutter, adb, aapt, and asc commands. Tests cover device selection, build/install failures, release configuration, destination checks, stale exports, and packaged metadata rejection.
+- `flutter build ios --release --no-codesign --target lib/main.dart --build-name 1.0.1 --build-number 2` passed on Xcode 27.0. Both processed app and Live Activity plists contain version `1.0.1`, build `2`; the existing bundle verifier also passed. The source pubspec version remains unchanged.
+- Android builds, physical-device installation, distribution signing, and live TestFlight publishing were not exercised. App Store Connect configuration and an explicit encryption declaration remain release prerequisites.
+
 ## Slide up to cancel speaking — 2026-09-13
 
 - Added release-to-cancel above the held microphone, reversible hover highlighting, entry haptics, accessible Start/Stop/Cancel, and English/Simplified Chinese/Traditional Chinese instructions. The microphone remains stationary when capture starts.

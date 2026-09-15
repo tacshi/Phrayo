@@ -33,6 +33,29 @@ scripts/install-ios.sh --skip-build --device <udid> --launch
 
 Release/Profile build once and install to the selected devices. Configure signing for both targets first. The script defaults to a clean build; use `--no-clean` to reuse artifacts. Debug always runs through Flutter on one device. Noninteractive runs with multiple devices require an explicit `--device` or `--all`. See `scripts/install-ios.sh --help` for all options.
 
+### Android scripts
+
+Phrayo has no Android project yet. These build commands require Android support to be added first:
+
+```sh
+scripts/build-apk.sh                    # arm64 release → dist/Phrayo.apk
+scripts/build-apk.sh --debug            # arm64 debug → dist/Phrayo-debug.apk
+scripts/install-apk.sh --all --launch   # Build once, install on selected devices
+```
+
+`BUILD_NAME` and `BUILD_NUMBER` optionally override the Flutter version. You can install an existing APK now with `scripts/install-apk.sh --apk /path/to/app.apk --device SERIAL`. Add Android SDK `platform-tools` to `PATH`; `--launch` also requires `aapt` from `build-tools/<version>`. One authorized device is selected automatically; multiple devices require an interactive selection or `--device`/`--all`. Use `--skip-build` to install the existing Flutter output for the selected release/debug mode.
+
+### Internal TestFlight
+
+Configure signing for Runner and PhrayoActivity, authenticate the `asc` CLI, and create Phrayo's App Store Connect record and internal tester group before releasing. This workflow requires an explicit `ITSAppUsesNonExemptEncryption=false` declaration in the app's Info.plist; it is currently absent. Check the app's encryption use before setting that declaration. Commit or stash local changes before running:
+
+```sh
+ASC_APP_ID='<phrayo-app-id>' ASC_TESTFLIGHT_GROUP='<internal-group-name-or-id>' \
+  scripts/release_testflight.sh 1.0.0 1
+```
+
+The script builds and checks the IPA, publishes it to the selected internal group, and waits for processing. The default timeout is 45 minutes (`ASC_TESTFLIGHT_TIMEOUT`). Xcode selection follows the iOS installer: `DEVELOPER_DIR` overrides `PREFERRED_XCODE`, with the active toolchain used when the preferred Xcode is unavailable. The Live Activity inherits the app's release version and build number.
+
 ## First use
 
 1. Choose spoken and target languages in Settings.
@@ -88,6 +111,12 @@ xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
 ```
 
 See [verification record](docs/verification.md) for executed checks and remaining device/provider acceptance. Build success is not a claim of validated microphone, Action Button or offline model performance.
+
+Build/release script checks use fake tools and never install or upload:
+
+```sh
+python3 -m unittest discover -s scripts -p 'test_release_scripts.py'
+```
 
 ### Correct transcription and add vocabulary
 
