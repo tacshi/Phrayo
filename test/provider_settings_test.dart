@@ -20,6 +20,8 @@ import 'package:phrayo/ui/settings_page.dart';
 class _Native extends PhrayoNative {
   final secrets = <String, String>{};
   @override
+  Future<String> ttsStatus(String language) async => 'ready';
+  @override
   Future<String?> readSecret(String service) async => secrets[service];
   @override
   Future<void> saveSecret(String service, String value) async {

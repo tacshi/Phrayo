@@ -9,6 +9,8 @@ import 'package:phrayo/services/platform.dart';
 
 class DesignNative extends PhrayoNative {
   @override
+  Future<String> ttsStatus(String language) async => 'ready';
+  @override
   Future<SessionMessage> start(
     String kind,
     String source,
@@ -176,9 +178,14 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      final native = NativeBridge(api: DesignNative());
+      addTearDown(native.dispose);
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [bootstrapProvider.overrideWith((ref) async {})],
+          overrides: [
+            bootstrapProvider.overrideWith((ref) async {}),
+            nativeProvider.overrideWithValue(native),
+          ],
           child: const PhrayoApp(),
         ),
       );

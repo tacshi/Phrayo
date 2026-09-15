@@ -36,6 +36,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String voiceStatus = 'checking';
   int voiceRevision = 0;
   final soniox = TextEditingController(), llm = TextEditingController();
+  final connectionControllers = {
+    for (final service in ['stt', 'llm']) service: ExpansibleController(),
+  };
   @override
   void initState() {
     super.initState();
@@ -77,6 +80,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ttsSub?.cancel();
     soniox.dispose();
     llm.dispose();
+    for (final controller in connectionControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -155,7 +161,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> check({bool prepare = false}) async {
     setState(() {
       busy = true;
-      operation = 'resources';
+      operation = prepare ? 'prepare' : 'check';
     });
     await action(context, () async {
       await save(includeLlm: false);
@@ -627,6 +633,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (mounted) setState(() => busy = false);
   }
 
+  Widget resourceAction({required bool prepare}) {
+    final label = prepare ? 'prepare' : 'check';
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      enabled: !busy,
+      title: Text(tr(context, label)),
+      trailing: busy && operation == label
+          ? const SizedBox.square(
+              dimension: 24,
+              child: Padding(
+                padding: EdgeInsets.all(2),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : Icon(prepare ? Icons.download_outlined : Icons.refresh),
+      onTap: busy ? null : () => check(prepare: prepare),
+    );
+  }
+
   Widget capabilityRow(String label, String status) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
     child: Row(
@@ -703,29 +728,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
         SectionLabel(tr(context, 'connections')),
-        ExpansionPanelList.radio(
-          elevation: 0,
-          expandedHeaderPadding: EdgeInsets.zero,
-          materialGapSize: 0,
+        Column(
           children: [
-            for (final service in ['stt', 'llm'])
-              ExpansionPanelRadio(
-                value: service,
-                canTapOnHeader: true,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                headerBuilder: (context, expanded) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(tr(context, service)),
-                  subtitle: Text(
-                    service == 'stt'
-                        ? sttProvider.label
-                        : tr(context, 'text_actions'),
+            for (final service in ['stt', 'llm']) ...[
+              ExpansionTile(
+                controller: connectionControllers[service],
+                maintainState: true,
+                tilePadding: EdgeInsets.zero,
+                shape: const Border(),
+                collapsedShape: const Border(),
+                title: Text(tr(context, service)),
+                subtitle: Text(
+                  service == 'stt'
+                      ? sttProvider.label
+                      : tr(context, 'text_actions'),
+                ),
+                onExpansionChanged: (expanded) {
+                  if (!expanded) return;
+                  for (final other in connectionControllers.entries) {
+                    if (other.key != service) other.value.collapse();
+                  }
+                },
+                children: [
+                  connectionForm(
+                    service == 'stt' ? sttProvider.secret : service,
                   ),
-                ),
-                body: connectionForm(
-                  service == 'stt' ? sttProvider.secret : service,
-                ),
+                ],
               ),
+              if (service == 'stt') const Divider(height: 1),
+            ],
           ],
         ),
         ListTile(
@@ -754,25 +785,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : capabilities!.translationStatus,
           ),
         ],
-        if (busy && operation == 'resources')
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: LinearProgressIndicator(),
-          ),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            TextButton(
-              onPressed: busy ? null : () => check(),
-              child: Text(tr(context, 'check')),
-            ),
-            OutlinedButton(
-              onPressed: busy ? null : () => check(prepare: true),
-              child: Text(tr(context, 'prepare')),
-            ),
-          ],
-        ),
+        resourceAction(prepare: false),
+        resourceAction(prepare: true),
         const SizedBox(height: 16),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
