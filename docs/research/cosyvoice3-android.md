@@ -20,8 +20,8 @@ The probe uses `app.capyvibe.phrayo.voiceprobe`. Keep it visible and the phone
 unlocked during measurement. Reports and explicitly exported test audio are
 written to its external-files `reports` directory and copied to
 `build/android-native/reports`. Stage logs contain timings and tensor dimensions.
-Release builds remain disabled by `android/VOICE_VALIDATION_PENDING`; use
-`scripts/build-apk.sh --debug` for the main app.
+Build the main app with `scripts/build-apk.sh --release` or
+`scripts/build-apk.sh --debug`.
 
 ## Integration
 

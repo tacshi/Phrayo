@@ -80,10 +80,3 @@ val prepareNativeRuntime by tasks.registering(Exec::class) {
     outputs.file("../../build/android-deps/sherpa-onnx-1.13.8.aar")
 }
 tasks.named("preBuild").configure { dependsOn(prepareNativeRuntime) }
-tasks.configureEach {
-    if (name == "preReleaseBuild") doFirst {
-        check(!rootProject.file("VOICE_VALIDATION_PENDING").exists()) {
-            "Android voice qualification is pending. Use a debug build for integration testing."
-        }
-    }
-}

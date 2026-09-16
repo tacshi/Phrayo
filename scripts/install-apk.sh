@@ -41,7 +41,7 @@ usage() {
 Usage: scripts/install-apk.sh [options]
 
 Build and install Phrayo on connected Android devices.
-  --release         Build/install release (requires Android qualification)
+  --release         Build/install release
   --debug           Build/install debug (default)
   --skip-build      Install the existing APK for the selected build type
   --apk PATH        Install a specific APK (implies --skip-build)

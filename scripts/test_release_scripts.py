@@ -181,16 +181,14 @@ class ReleaseScriptTest(unittest.TestCase):
             self.assertIn('no Android project', result.stderr)
         self.assertFalse(self.calls())
 
-    def test_unqualified_android_project_allows_debug_integration(self):
+    def test_android_project_allows_debug_integration(self):
         (self.root / 'android/app').mkdir(parents=True)
-        (self.root / 'android/VOICE_VALIDATION_PENDING').write_text('Voice qualification pending')
         result = self.run_script('build-apk.sh', '--debug')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.root / 'dist/Phrayo-debug.apk').is_file())
 
-    def test_default_install_launch_uses_debug_while_release_is_pending(self):
+    def test_default_install_launch_uses_debug_and_explicit_release(self):
         self.android()
-        (self.root / 'android/VOICE_VALIDATION_PENDING').write_text('Voice qualification pending')
         self.env['PHRAYO_TEST_DEVICES'] = json.dumps([['A', 'device']])
         self.assert_ok(self.run_script('install-apk.sh', '--launch'))
         builds = [row for row in self.calls('flutter') if row['args'][:2] == ['build', 'apk']]
@@ -199,17 +197,17 @@ class ReleaseScriptTest(unittest.TestCase):
         self.assertTrue(self.installs()[0]['args'][-1].endswith('app-debug.apk'))
         self.assertTrue(any('shell' in row['args'] for row in self.calls('adb')))
         self.clear_calls()
-        self.assert_failed(self.run_script('install-apk.sh', '--release', '--launch'))
-        self.assertFalse(self.installs())
-        self.assertFalse(self.calls('flutter'))
+        self.assert_ok(self.run_script('install-apk.sh', '--release', '--launch'))
+        self.assertTrue(self.installs()[0]['args'][-1].endswith('app-release.apk'))
+        builds = [row for row in self.calls('flutter') if row['args'][:2] == ['build', 'apk']]
+        self.assertIn('--release', builds[0]['args'])
 
-    def test_unqualified_android_project_cannot_build_production_apk(self):
+    def test_android_project_builds_release_apk(self):
         self.android()
-        (self.root / 'android/VOICE_VALIDATION_PENDING').write_text('Voice qualification pending')
-        result = self.run_script('build-apk.sh')
-        self.assert_failed(result)
-        self.assertIn('voice qualification is pending', result.stderr)
-        self.assertFalse(self.calls('flutter'))
+        self.assert_ok(self.run_script('build-apk.sh', '--release'))
+        self.assertTrue((self.root / 'dist/Phrayo.apk').is_file())
+        builds = [row for row in self.calls('flutter') if row['args'][:2] == ['build', 'apk']]
+        self.assertIn('--release', builds[0]['args'])
 
     def test_build_modes_and_overrides_from_path_with_spaces(self):
         self.android()

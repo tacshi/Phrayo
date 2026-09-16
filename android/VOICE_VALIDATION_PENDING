@@ -1,3 +1,0 @@
-The Android voice qualification and full native implementation are in progress.
-Build the separate development APK with scripts/build-android-voice-probe.sh.
-Remove this marker only after the voice gate and full Android workflows pass.

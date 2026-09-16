@@ -44,7 +44,7 @@ scripts/install-apk.sh --skip-build --device SERIAL --launch
 
 Offline transcription uses a separately prepared SenseVoice Small model. Offline translation uses [Google Translate](https://cloud.google.com/translate) through ML Kit; Cantonese requires a configured text provider. The listening voice is a separate download in Settings.
 
-Release APK builds remain blocked by `android/VOICE_VALIDATION_PENDING` until voice qualification and Android workflow checks pass. To build the separate voice-check app:
+To build the separate voice-check app:
 
 ```sh
 scripts/build-android-voice-probe.sh
@@ -53,7 +53,7 @@ PHRAYO_VULKAN=ON scripts/build-android-voice-probe.sh  # GPU comparison build
 
 This creates `dist/Phrayo-Voice-Check.apk` with application ID `app.capyvibe.phrayo.voiceprobe`. Its model download is separate from the APK. See [Android voice qualification](docs/research/cosyvoice3-android.md) for requirements, measured results, and device test commands.
 
-After qualification, release commands are:
+To build a release APK:
 
 ```sh
 scripts/build-apk.sh                    # arm64 release → dist/Phrayo.apk
