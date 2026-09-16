@@ -38,8 +38,8 @@ Release/Profile build once and install to the selected devices. Configure signin
 Build and install the Android integration app (JDK 21, SDK 36, NDK 28.2.13676358, CMake 3.28+, Ninja and Python 3.12+):
 
 ```sh
-scripts/build-apk.sh --debug
-scripts/install-apk.sh --debug --skip-build --device SERIAL --launch
+scripts/install-apk.sh --launch          # Build and install debug (default)
+scripts/install-apk.sh --skip-build --device SERIAL --launch
 ```
 
 Offline transcription uses a separately prepared SenseVoice Small model. Offline translation uses [Google Translate](https://cloud.google.com/translate) through ML Kit; Cantonese requires a configured text provider. The listening voice is a separate download in Settings.
@@ -57,10 +57,10 @@ After qualification, release commands are:
 
 ```sh
 scripts/build-apk.sh                    # arm64 release → dist/Phrayo.apk
-scripts/install-apk.sh --all --launch   # Build once, install on selected devices
+scripts/install-apk.sh --release --all --launch   # Build once, install on selected devices
 ```
 
-`BUILD_NAME` and `BUILD_NUMBER` optionally override the Flutter version. You can install an existing APK now with `scripts/install-apk.sh --apk /path/to/app.apk --device SERIAL`. Add Android SDK `platform-tools` to `PATH`; `--launch` also requires `aapt` from `build-tools/<version>`. One authorized device is selected automatically; multiple devices require an interactive selection or `--device`/`--all`. Use `--skip-build` to install the existing Flutter output for the selected release/debug mode.
+`BUILD_NAME` and `BUILD_NUMBER` optionally override the Flutter version. You can install an existing APK with `scripts/install-apk.sh --apk /path/to/app.apk --device SERIAL`. Add Android SDK `platform-tools` to `PATH`; `--launch` locates `aapt` through PATH, `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `android/local.properties`, or standard SDK locations. One authorized device is selected automatically; multiple devices require an interactive selection or `--device`/`--all`. Use `--skip-build` to install the existing Flutter output for the selected debug/release mode.
 
 ### Internal TestFlight
 

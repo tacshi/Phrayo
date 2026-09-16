@@ -29,7 +29,7 @@ done
 [[ -d "$ROOT_DIR/android/app" ]] ||
   die "Phrayo has no Android project. Add Android support before building an APK."
 [[ "$BUILD_TYPE" != release || ! -f "$ROOT_DIR/android/VOICE_VALIDATION_PENDING" ]] ||
-  die "Android voice qualification is pending. Build scripts/build-android-voice-probe.sh first; production APKs are not ready."
+  die "Android voice qualification is pending; release builds are blocked. Use scripts/install-apk.sh --debug --launch for device testing."
 command -v flutter >/dev/null 2>&1 || die "flutter not found in PATH."
 
 BUILD_ARGS=()

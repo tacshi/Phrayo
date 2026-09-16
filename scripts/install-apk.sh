@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_TYPE="release"
+BUILD_TYPE="debug"
 SKIP_BUILD=0
 LAUNCH=0
 ALL_DEVICES=0
@@ -14,13 +14,35 @@ SELECTED_SERIALS=()
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 require_command() { command -v "$1" >/dev/null 2>&1 || die "$1 not found in PATH. $2"; }
 
+find_aapt() {
+  local sdk candidate local_sdk=""
+  if command -v aapt >/dev/null 2>&1; then
+    command -v aapt
+    return 0
+  fi
+  if [[ -f "$ROOT_DIR/android/local.properties" ]]; then
+    local_sdk="$(sed -n 's/^sdk\.dir=//p' "$ROOT_DIR/android/local.properties" | head -n 1 | tr -d '\r')"
+  fi
+  for sdk in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$local_sdk" \
+    "${HOME:-}/Library/Android/sdk" "${HOME:-}/Android/Sdk"; do
+    [[ -n "$sdk" ]] || continue
+    for candidate in "$sdk"/build-tools/*/aapt; do
+      if [[ -x "$candidate" && -f "$candidate" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
 usage() {
   cat <<'EOF'
 Usage: scripts/install-apk.sh [options]
 
 Build and install Phrayo on connected Android devices.
-  --release         Build/install release (default)
-  --debug           Build/install debug
+  --release         Build/install release (requires Android qualification)
+  --debug           Build/install debug (default)
   --skip-build      Install the existing APK for the selected build type
   --apk PATH        Install a specific APK (implies --skip-build)
   --device SERIAL   Select a device; repeat to select several
@@ -71,7 +93,7 @@ if [[ "$SKIP_BUILD" -eq 1 ]]; then
 fi
 require_command adb "Add Android SDK platform-tools to PATH."
 if [[ "$LAUNCH" -eq 1 ]]; then
-  require_command aapt "Add Android SDK build-tools/<version> to PATH to use --launch."
+  AAPT="$(find_aapt)" || die "aapt not found. Install Android SDK Build-Tools and set ANDROID_HOME or sdk.dir in android/local.properties."
 fi
 
 DEVICE_OUTPUT="$(adb devices -l)" || die "Unable to list Android devices. Check adb devices."
@@ -144,7 +166,7 @@ fi
 [[ -f "$APK_PATH" ]] || die "APK not found: $APK_PATH"
 
 if [[ "$LAUNCH" -eq 1 ]]; then
-  BADGING="$(aapt dump badging "$APK_PATH")" || die "Unable to inspect APK. Check the APK path and Android SDK aapt."
+  BADGING="$("$AAPT" dump badging "$APK_PATH")" || die "Unable to inspect APK. Check the APK path and Android SDK aapt."
   PACKAGE_NAME="$(printf '%s\n' "$BADGING" | awk -F "'" '/^package: name=/ {print $2}')"
   MAIN_ACTIVITY="$(printf '%s\n' "$BADGING" | awk -F "'" '/^launchable-activity: name=/ {print $2}')"
   [[ "$PACKAGE_NAME" =~ ^[a-zA-Z0-9_.]+$ && "$MAIN_ACTIVITY" =~ ^[a-zA-Z0-9_.$]+$ ]] ||
@@ -154,7 +176,7 @@ fi
 FAILED=0
 for serial in "${SELECTED_SERIALS[@]}"; do
   printf '==> Installing on %s\n' "$serial"
-  if ! adb -s "$serial" install -r "$APK_PATH"; then
+  if ! adb -s "$serial" install --no-streaming -r "$APK_PATH"; then
     printf 'Error: Installation failed on %s. Check adb devices and retry with --device.\n' "$serial" >&2
     FAILED=1
     continue

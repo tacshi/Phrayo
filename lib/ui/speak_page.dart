@@ -561,20 +561,22 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        TextButton(
-                          key: const ValueKey('translate-speech'),
-                          onPressed:
-                              busy ||
-                                  changingLanguage ||
-                                  input.text.trim().isEmpty
-                              ? null
-                              : translate,
-                          child: Text(
-                            tr(
-                              context,
-                              usesGoogleTranslation(settings)
-                                  ? 'translate_google'
-                                  : 'translate',
+                        Flexible(
+                          child: TextButton(
+                            key: const ValueKey('translate-speech'),
+                            onPressed:
+                                busy ||
+                                    changingLanguage ||
+                                    input.text.trim().isEmpty
+                                ? null
+                                : translate,
+                            child: Text(
+                              tr(
+                                context,
+                                usesGoogleTranslation(settings)
+                                    ? 'translate_google'
+                                    : 'translate',
+                              ),
                             ),
                           ),
                         ),
@@ -601,14 +603,15 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                           ),
                           if (googleTranslation) const TranslationAttribution(),
                           const SizedBox(height: 20),
-                          Wrap(
+                          Row(
                             spacing: 8,
-                            runSpacing: 8,
                             children: [
-                              SpeechButton(
-                                text: output,
-                                language: settings.target,
-                                enabled: !busy && !recording && !starting,
+                              Flexible(
+                                child: SpeechButton(
+                                  text: output,
+                                  language: settings.target,
+                                  enabled: !busy && !recording && !starting,
+                                ),
                               ),
                               IconButton(
                                 tooltip: tr(context, saved ? 'saved' : 'save'),
@@ -641,21 +644,23 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                       : Icons.bookmark_add_outlined,
                                 ),
                               ),
-                              TextButton(
-                                onPressed: busy
-                                    ? null
-                                    : () =>
-                                          Navigator.of(
-                                            context,
-                                            rootNavigator: true,
-                                          ).push(
-                                            MaterialPageRoute<void>(
-                                              builder: (_) => PracticePage(
-                                                expression: expression(),
+                              Flexible(
+                                child: TextButton(
+                                  onPressed: busy
+                                      ? null
+                                      : () =>
+                                            Navigator.of(
+                                              context,
+                                              rootNavigator: true,
+                                            ).push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) => PracticePage(
+                                                  expression: expression(),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                child: Text(tr(context, 'practice')),
+                                  child: Text(tr(context, 'practice')),
+                                ),
                               ),
                               PopupMenuButton<String>(
                                 tooltip: tr(context, 'more'),

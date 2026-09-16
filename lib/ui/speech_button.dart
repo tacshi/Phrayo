@@ -109,18 +109,27 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
   Widget build(BuildContext context) {
     if (preparing) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Wrap(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           spacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             const SizedBox.square(
               dimension: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            Semantics(
-              liveRegion: true,
-              child: Text(tr(context, 'preparing_speech')),
+            Flexible(
+              child: Semantics(
+                liveRegion: true,
+                child: Tooltip(
+                  message: tr(context, 'preparing_speech'),
+                  child: Text(
+                    tr(context, 'preparing_speech'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

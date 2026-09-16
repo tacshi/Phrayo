@@ -188,6 +188,21 @@ class ReleaseScriptTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.root / 'dist/Phrayo-debug.apk').is_file())
 
+    def test_default_install_launch_uses_debug_while_release_is_pending(self):
+        self.android()
+        (self.root / 'android/VOICE_VALIDATION_PENDING').write_text('Voice qualification pending')
+        self.env['PHRAYO_TEST_DEVICES'] = json.dumps([['A', 'device']])
+        self.assert_ok(self.run_script('install-apk.sh', '--launch'))
+        builds = [row for row in self.calls('flutter') if row['args'][:2] == ['build', 'apk']]
+        self.assertEqual(len(builds), 1)
+        self.assertIn('--debug', builds[0]['args'])
+        self.assertTrue(self.installs()[0]['args'][-1].endswith('app-debug.apk'))
+        self.assertTrue(any('shell' in row['args'] for row in self.calls('adb')))
+        self.clear_calls()
+        self.assert_failed(self.run_script('install-apk.sh', '--release', '--launch'))
+        self.assertFalse(self.installs())
+        self.assertFalse(self.calls('flutter'))
+
     def test_unqualified_android_project_cannot_build_production_apk(self):
         self.android()
         (self.root / 'android/VOICE_VALIDATION_PENDING').write_text('Voice qualification pending')
@@ -229,6 +244,7 @@ class ReleaseScriptTest(unittest.TestCase):
         self.assert_ok(self.run_script('install-apk.sh', '--device', 'B', '--device', 'B', '--device', 'A'))
         self.assertEqual(len([row for row in self.calls('flutter') if row['args'][:2] == ['build', 'apk']]), 1)
         self.assertEqual([row['args'][1] for row in self.installs()], ['B', 'A'])
+        self.assertTrue(all('--no-streaming' in row['args'] for row in self.installs()))
 
     def test_explicit_relative_apk_launch_uses_packaged_identity(self):
         apk = self.apk()
@@ -243,6 +259,32 @@ class ReleaseScriptTest(unittest.TestCase):
         self.assertTrue(all(shlex.split(row['args'][-1]) == ['org.example.custom.debug/org.example.Main$Activity']
                             for row in launches))
         self.assertTrue(all(row['args'][-1].startswith("'") for row in launches))
+
+    def test_launch_finds_aapt_outside_path(self):
+        sdk = self.root / 'Android SDK'
+        aapt = sdk / 'build-tools/36.0.0/aapt'
+        aapt.parent.mkdir(parents=True)
+        shutil.move(self.tools / 'aapt', aapt)
+        incomplete = sdk / 'build-tools/99.0.0/aapt'
+        incomplete.parent.mkdir(parents=True)
+        incomplete.write_text('not executable')
+        self.android()
+        properties = self.root / 'android/local.properties'
+        apk = self.apk()
+        for source in ('ANDROID_HOME', 'ANDROID_SDK_ROOT', 'local.properties'):
+            with self.subTest(source=source):
+                self.clear_calls()
+                self.env.pop('ANDROID_HOME', None)
+                self.env.pop('ANDROID_SDK_ROOT', None)
+                if source == 'local.properties':
+                    properties.write_text(f'sdk.dir={sdk}\n')
+                else:
+                    self.env[source] = str(sdk)
+                self.assert_ok(self.run_script(
+                    'install-apk.sh', '--apk', str(apk), '--device', 'A', '--launch'))
+                self.assertEqual(len(self.calls('aapt')), 1)
+                self.assertEqual(len(self.installs()), 1)
+                self.assertTrue(any('shell' in row['args'] for row in self.calls('adb')))
 
     def test_skip_build_selects_debug_output(self):
         apk = self.root / 'build/app/outputs/flutter-apk/app-debug.apk'
