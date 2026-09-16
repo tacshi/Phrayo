@@ -1,0 +1,11 @@
+<resources>
+    <string name="audio_channel">Recording and playback</string>
+    <string name="recording">Recording</string>
+    <string name="playing">Playing audio</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="stop">Stop</string>
+    <string name="start_speaking">Start speaking</string>
+    <string name="microphone_ready">Microphone ready. Start speaking again.</string>
+    <string name="shortcut_failed">Open Phrayo to check microphone access and start recording.</string>
+</resources>

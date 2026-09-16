@@ -35,11 +35,28 @@ Release/Profile build once and install to the selected devices. Configure signin
 
 ### Android scripts
 
-Phrayo has no Android project yet. These build commands require Android support to be added first:
+Build and install the Android integration app (JDK 21, SDK 36, NDK 28.2.13676358, CMake 3.28+, Ninja and Python 3.12+):
+
+```sh
+scripts/build-apk.sh --debug
+scripts/install-apk.sh --debug --skip-build --device SERIAL --launch
+```
+
+Offline transcription uses a separately prepared SenseVoice Small model. Offline translation uses [Google Translate](https://cloud.google.com/translate) through ML Kit; Cantonese requires a configured text provider. The listening voice is a separate download in Settings.
+
+Release APK builds remain blocked by `android/VOICE_VALIDATION_PENDING` until voice qualification and Android workflow checks pass. To build the separate voice-check app:
+
+```sh
+scripts/build-android-voice-probe.sh
+PHRAYO_VULKAN=ON scripts/build-android-voice-probe.sh  # GPU comparison build
+```
+
+This creates `dist/Phrayo-Voice-Check.apk` with application ID `app.capyvibe.phrayo.voiceprobe`. Its model download is separate from the APK. See [Android voice qualification](docs/research/cosyvoice3-android.md) for requirements, measured results, and device test commands.
+
+After qualification, release commands are:
 
 ```sh
 scripts/build-apk.sh                    # arm64 release → dist/Phrayo.apk
-scripts/build-apk.sh --debug            # arm64 debug → dist/Phrayo-debug.apk
 scripts/install-apk.sh --all --launch   # Build once, install on selected devices
 ```
 
@@ -47,7 +64,7 @@ scripts/install-apk.sh --all --launch   # Build once, install on selected device
 
 ### Internal TestFlight
 
-Configure signing for Runner and PhrayoActivity, authenticate the `asc` CLI, and create Phrayo's App Store Connect record and internal tester group before releasing. This workflow requires an explicit `ITSAppUsesNonExemptEncryption=false` declaration in the app's Info.plist; it is currently absent. Check the app's encryption use before setting that declaration. Commit or stash local changes before running:
+Configure signing for Runner and PhrayoActivity, authenticate the `asc` CLI, and create Phrayo's App Store Connect record and internal tester group before releasing. The script verifies the app's encryption declaration and requires a clean worktree:
 
 ```sh
 ASC_APP_ID='<phrayo-app-id>' ASC_TESTFLIGHT_GROUP='<internal-group-name-or-id>' \

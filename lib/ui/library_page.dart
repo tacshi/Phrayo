@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../core/models.dart';
 import '../core/providers.dart';
 import 'strings.dart';
+import 'translation_attribution.dart';
 import 'common.dart';
 
 class LibraryPage extends ConsumerStatefulWidget {
@@ -149,6 +150,8 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                                     height: 1.5,
                                   ),
                             ),
+                            if (p.googleTranslation)
+                              const TranslationAttribution(),
                             const SizedBox(height: 8),
                             Text(
                               p.source,
@@ -234,6 +237,7 @@ Future<void> editExpression(
                 labelText: tr(context, 'translation'),
               ),
             ),
+            if (p.googleTranslation) const TranslationAttribution(),
           ],
         ),
       ),
@@ -256,6 +260,8 @@ Future<void> editExpression(
       ...p.toJson(),
       'source': source.text.trim(),
       'target': target.text.trim(),
+      'googleTranslation':
+          p.googleTranslation && target.text.trim() == p.target,
       'revision': p.revision + 1,
     });
   }
@@ -448,6 +454,8 @@ class _PracticePageState extends ConsumerState<PracticePage> {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(height: 1.5),
                       ),
+                      if (expression.googleTranslation)
+                        const TranslationAttribution(),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,

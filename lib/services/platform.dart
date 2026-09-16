@@ -1,8 +1,18 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
 import '../core/native.g.dart';
 
 class NativeBridge implements PhrayoEvents {
+  Future<void> cancelTranscription(String path) async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await const MethodChannel('app.capyvibe.phrayo/android')
+          .invokeMethod<void>('cancelTranscription', path);
+    }
+  }
+
   final PhrayoNative api;
   final sessions = StreamController<SessionMessage>.broadcast();
   final ttsDownloads = StreamController<double?>.broadcast();

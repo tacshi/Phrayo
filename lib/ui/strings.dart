@@ -1,6 +1,43 @@
 import 'package:flutter/material.dart';
 
 const words = <String, List<String>>{
+  'android_shortcut': ['Recording shortcut', '录音快捷方式', '錄音捷徑'],
+  'android_shortcut_help': [
+    'Touch and hold Phrayo’s icon, then choose Start speaking. Drag the shortcut to your Home screen for quick access.',
+    '长按 Phrayo 图标，选择「开始说话」。可将快捷方式拖到主屏幕。',
+    '長按 Phrayo 圖示，選擇「開始說話」。可將捷徑拖到主畫面。',
+  ],
+  'android_local_services': [
+    'Downloaded transcription and translation models only.',
+    '仅使用已下载的转写与翻译模型。',
+    '僅使用已下載的轉寫與翻譯模型。',
+  ],
+  'translate_google': ['Translate with Google', '使用 Google 翻译', '使用 Google 翻譯'],
+  'credential_unavailable': [
+    'Save your API key again in Settings.',
+    '请在设置中重新保存 API 密钥。',
+    '請在設定中重新儲存 API 金鑰。',
+  ],
+  'model_download_failed': [
+    'Model download failed. Prepare it again in Settings.',
+    '模型下载失败，请在设置中重新准备。',
+    '模型下載失敗，請在設定中重新準備。',
+  ],
+  'tts_resources_missing': [
+    'Prepare the listening voice in Settings.',
+    '请在设置中准备听力语音。',
+    '請在設定中準備聆聽語音。',
+  ],
+  'microphone_unavailable': [
+    'Microphone unavailable. Close other recording apps and retry.',
+    '麦克风不可用，请关闭其他录音应用后重试。',
+    '麥克風無法使用，請關閉其他錄音應用程式後重試。',
+  ],
+  'audio_playback_failed': [
+    'Could not play audio. Try again.',
+    '音频播放失败，请重试。',
+    '音訊播放失敗，請重試。',
+  ],
   'save_to_expressions': ['Save to Expressions', '保存到表达库', '儲存到表達庫'],
   'recording_changed': [
     'Recording changed. Reopen it and try again.',
@@ -40,9 +77,9 @@ const words = <String, List<String>>{
     '請將每個詞彙縮短至 30 個字元以內。',
   ],
   'vocabulary_unavailable': [
-    'Custom vocabulary is unavailable for system transcription in this language. Use Soniox or MOSS Pro to apply it.',
-    '此语言的系统转写不支持自定义词汇。如需使用，请选择 Soniox 或 MOSS Pro。',
-    '此語言的系統轉寫不支援自訂詞彙。如需使用，請選擇 Soniox 或 MOSS Pro。',
+    'Custom vocabulary is unavailable for offline transcription in this language. Use Soniox or MOSS Pro to apply it.',
+    '此语言的离线转写不支持自定义词汇。如需使用，请选择 Soniox 或 MOSS Pro。',
+    '此語言的離線轉寫不支援自訂詞彙。如需使用，請選擇 Soniox 或 MOSS Pro。',
   ],
   'translated_text': ['Translation', '译文', '譯文'],
   'retranslate': ['Translate again', '重新翻译', '重新翻譯'],

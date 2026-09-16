@@ -211,11 +211,23 @@ class TranscriptionService {
             ['submission_unknown', 'upload_unknown'].contains(job['stage'])) {
           throw StateError('online_required');
         }
-        final result = await native.api.transcribe(
-          recording.path,
-          recording.sourceLanguage,
-          (job['transcriptionTerms'] as List? ?? const []).cast<String>(),
+        var nativeRunning = true;
+        unawaited(
+          cancellation.whenCancel.then((_) async {
+            if (nativeRunning) {
+              await native
+                  .cancelTranscription(recording.path)
+                  .catchError((Object _) {});
+            }
+          }),
         );
+        final result = await native.api
+            .transcribe(
+              recording.path,
+              recording.sourceLanguage,
+              (job['transcriptionTerms'] as List? ?? const []).cast<String>(),
+            )
+            .whenComplete(() => nativeRunning = false);
         segments = result
             .map(
               (s) => Segment(
@@ -313,6 +325,7 @@ class TranscriptionService {
         'state': 'transcribed',
         'summary': <dynamic>[],
         'translation': '',
+        'googleTranslation': false,
         'translationStyle': TranslationStyle.standard.name,
       };
       await db.transaction(() async {

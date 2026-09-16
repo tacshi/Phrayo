@@ -1,0 +1,80 @@
+{
+  "sources": {
+    "cosyvoice": {
+      "repository": "Lourdle/cosyvoice.cpp",
+      "revision": "1616b12215407193fafb08111e7fd2939f977789",
+      "archive_sha256": "a443556884608b053485193970ebf84d46145fbf5cddd2b042851382d4ff12e3",
+      "directory": "cosyvoice.cpp-1616b12215407193fafb08111e7fd2939f977789"
+    },
+    "ggml": {
+      "repository": "ggml-org/ggml",
+      "revision": "e91ded11bdcd78c42f9c8d3978ff6686eb4c1226",
+      "archive_sha256": "47c5b431c8db3b2f5d26e9cc659318d129cfc52c17d4ca81b26ef9cbea794e6d",
+      "directory": "ggml-e91ded11bdcd78c42f9c8d3978ff6686eb4c1226"
+    },
+    "pcre2": {
+      "repository": "PCRE2Project/pcre2",
+      "revision": "7978954dbd2efc6f2196869290553cf1871b4ce6",
+      "archive_sha256": "694f0cd702ea5e1ac2862c75809db6ff22153333d4b1e768b2f9b36c17a2a065",
+      "directory": "pcre2-7978954dbd2efc6f2196869290553cf1871b4ce6"
+    },
+    "vulkan_headers": {
+      "repository": "KhronosGroup/Vulkan-Headers",
+      "revision": "ee2ec5fd83dafce291024683b50dc89219333076",
+      "archive_sha256": "df7a152381a7fdaf98e36de7716b8d6d6ead776764bc76d1a1aef9049d1bca89",
+      "directory": "Vulkan-Headers-ee2ec5fd83dafce291024683b50dc89219333076"
+    },
+    "spirv_headers": {
+      "repository": "KhronosGroup/SPIRV-Headers",
+      "revision": "04fd3caa1e8267e4d95c806cad901181728e1006",
+      "archive_sha256": "392f4801409aad9c4f1b77745f179952fd6264e4c8bd0fc1bc45dfa6807bf6d0",
+      "directory": "SPIRV-Headers-04fd3caa1e8267e4d95c806cad901181728e1006"
+    },
+    "mecab_swift": {
+      "repository": "shinjukunian/Mecab-Swift",
+      "revision": "1f096492e37fc05fc2e7304091f54889974c5368",
+      "archive_sha256": "1d609692423ebc7325c2a1eb533e8e42f2ce53b68035d298f2d3ffe9c1b5c361",
+      "directory": "Mecab-Swift-1f096492e37fc05fc2e7304091f54889974c5368"
+    },
+    "mecab": {
+      "repository": "shinjukunian/mecab",
+      "revision": "aa318f82798d72e5cb52ba5f6b10f0b780b30d05",
+      "archive_sha256": "8d929b13e5ceaa816eb1490d68667c390fa9d0c9d58e959af822b4bc257fba5f",
+      "directory": "mecab-aa318f82798d72e5cb52ba5f6b10f0b780b30d05"
+    },
+    "simde": {
+      "repository": "simd-everywhere/simde",
+      "revision": "71fd833d9666141edcd1d3c109a80e228303d8d7",
+      "archive_sha256": "72b2c14a487560b7eb203795f2c2fead5c7499662e639944cca2a9bb19f09029",
+      "directory": "simde-71fd833d9666141edcd1d3c109a80e228303d8d7"
+    }
+  },
+  "android_artifacts": {
+    "sherpa-onnx-1.13.8.aar": {
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar",
+      "sha256": "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+    }
+  },
+  "asr": {
+    "id": "sensevoice-2365bae-v1",
+    "files": [
+      {"name":"model.int8.onnx","bytes":239233841,"sha256":"c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51","url":"https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx"},
+      {"name":"tokens.txt","bytes":315894,"sha256":"f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc","url":"https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/tokens.txt"},
+      {"name":"silero_vad.onnx","bytes":643854,"sha256":"9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6","url":"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"}
+    ]
+  },
+  "models": {
+    "repository": "Lourdle/Fun-CosyVoice3-0.5B-2512-GGUF",
+    "revision": "ab01740bbbfcc059fd748163787554f7c8977e64",
+    "f16": {
+      "filename": "CosyVoice3-2512_F16.gguf",
+      "bytes": 1724750240,
+      "sha256": "66f77746c066c6144ad48deae30c06b38a98bec2835aeb5bfe827b70c9254c24"
+    },
+    "q8": {
+      "filename": "CosyVoice3-2512_Q8_0.gguf",
+      "bytes": 943933536,
+      "sha256": "be133cb6154ca73cd1d213b1c9496def99ba9c1f7c14cd99f6b350af2eb7963d"
+    }
+  }
+}

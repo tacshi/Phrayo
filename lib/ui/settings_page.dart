@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -720,7 +722,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               RadioListTile<bool>(
                 value: true,
                 title: Text(tr(context, 'local')),
-                subtitle: Text(tr(context, 'local_services')),
+                subtitle: Text(
+                  tr(
+                    context,
+                    defaultTargetPlatform == TargetPlatform.android
+                        ? 'android_local_services'
+                        : 'local_services',
+                  ),
+                ),
                 contentPadding: EdgeInsets.zero,
                 enabled: !busy,
               ),
@@ -793,9 +802,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           childrenPadding: const EdgeInsets.only(bottom: 16),
           shape: const Border(),
           collapsedShape: const Border(),
-          title: Text(tr(context, 'action_button')),
+          title: Text(
+            tr(
+              context,
+              defaultTargetPlatform == TargetPlatform.android
+                  ? 'android_shortcut'
+                  : 'action_button',
+            ),
+          ),
           children: [
-            Text(tr(context, 'action_help')),
+            Text(
+              tr(
+                context,
+                defaultTargetPlatform == TargetPlatform.android
+                    ? 'android_shortcut_help'
+                    : 'action_help',
+              ),
+            ),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -809,6 +832,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
         SectionLabel(tr(context, 'data')),
+        if (defaultTargetPlatform == TargetPlatform.android)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(MaterialLocalizations.of(context).licensesPageTitle),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () =>
+                showLicensePage(context: context, applicationName: 'Phrayo'),
+          ),
         if (busy && operation == 'data') const LinearProgressIndicator(),
         Align(
           alignment: Alignment.centerLeft,

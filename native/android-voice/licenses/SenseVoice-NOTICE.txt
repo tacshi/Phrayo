@@ -1,0 +1,5 @@
+SenseVoice Small by FunAudioLLM / Alibaba Group.
+https://huggingface.co/FunAudioLLM/SenseVoiceSmall
+ONNX conversion and INT8 quantization: sherpa-onnx contributors.
+https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17
+The model uses the FunASR Model License; see SenseVoice-model-license.txt.

@@ -14,6 +14,7 @@ import 'package:phrayo/services/platform.dart';
 import 'package:phrayo/services/text_processor.dart';
 import 'package:phrayo/services/transcription.dart';
 import 'package:phrayo/ui/recordings_page.dart';
+import 'package:phrayo/ui/translation_attribution.dart';
 
 import 'support/ready_speech_native.dart';
 
@@ -230,7 +231,9 @@ void main() {
           await tester.tap(find.widgetWithText(Tab, 'Translation'));
           await tester.pumpAndSettle();
           expect(find.text('已翻译'), findsOneWidget);
-          expect(find.text('Translate again'), findsOneWidget);
+          expect(find.text('Translate with Google'), findsOneWidget);
+          expect(find.byType(TranslationAttribution), findsOneWidget);
+          expect((await db.get('r'))!['googleTranslation'], isTrue);
         }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());

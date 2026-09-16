@@ -5,6 +5,8 @@ import 'package:pigeon/pigeon.dart';
   PigeonOptions(
     dartOut: 'lib/core/native.g.dart',
     swiftOut: 'ios/Runner/Native.g.swift',
+    kotlinOut: 'android/app/src/main/kotlin/app/capyvibe/phrayo/Native.g.kt',
+    kotlinOptions: KotlinOptions(package: 'app.capyvibe.phrayo'),
   ),
 )
 class SegmentMessage {

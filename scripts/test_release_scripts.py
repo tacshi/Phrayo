@@ -181,6 +181,21 @@ class ReleaseScriptTest(unittest.TestCase):
             self.assertIn('no Android project', result.stderr)
         self.assertFalse(self.calls())
 
+    def test_unqualified_android_project_allows_debug_integration(self):
+        (self.root / 'android/app').mkdir(parents=True)
+        (self.root / 'android/VOICE_VALIDATION_PENDING').write_text('Voice qualification pending')
+        result = self.run_script('build-apk.sh', '--debug')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / 'dist/Phrayo-debug.apk').is_file())
+
+    def test_unqualified_android_project_cannot_build_production_apk(self):
+        self.android()
+        (self.root / 'android/VOICE_VALIDATION_PENDING').write_text('Voice qualification pending')
+        result = self.run_script('build-apk.sh')
+        self.assert_failed(result)
+        self.assertIn('voice qualification is pending', result.stderr)
+        self.assertFalse(self.calls('flutter'))
+
     def test_build_modes_and_overrides_from_path_with_spaces(self):
         self.android()
         self.env.update(BUILD_NAME='2.3.4', BUILD_NUMBER='5')

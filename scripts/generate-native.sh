@@ -14,5 +14,7 @@ for declaration in ('protocol PhrayoEventsProtocol {', 'class PhrayoEvents: Phra
         raise SystemExit('Pigeon event declarations changed; review MainActor generation.')
     s = s.replace(declaration, '@MainActor\n' + declaration)
 p.write_text(s)
+kotlin = Path('android/app/src/main/kotlin/app/capyvibe/phrayo/Native.g.kt')
+kotlin.write_text('\n'.join(line.rstrip() for line in kotlin.read_text().splitlines()) + '\n')
 PY
 dart format lib/core/native.g.dart

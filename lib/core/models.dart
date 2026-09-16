@@ -5,6 +5,7 @@ import 'stt_provider.dart';
 export 'stt_provider.dart';
 
 class Expression {
+  final bool googleTranslation;
   final String id, source, target, sourceLanguage, targetLanguage;
   final String? recordingId, audioPath;
   final List<String> sourceIds;
@@ -12,6 +13,7 @@ class Expression {
   final int revision, interval;
   final DateTime created, due;
   Expression({
+    this.googleTranslation = false,
     required this.id,
     required this.source,
     required this.target,
@@ -29,6 +31,7 @@ class Expression {
   }) : created = created ?? DateTime.now(),
        due = due ?? DateTime.now();
   Map<String, dynamic> toJson() => {
+    'googleTranslation': googleTranslation,
     'id': id,
     'source': source,
     'target': target,
@@ -45,6 +48,7 @@ class Expression {
     'due': due.toIso8601String(),
   };
   factory Expression.fromJson(Map<String, dynamic> j) => Expression(
+    googleTranslation: j['googleTranslation'] == true,
     id: j['id'],
     source: j['source'],
     target: j['target'],
@@ -117,6 +121,7 @@ enum TranslationStyle {
 }
 
 class Recording {
+  final bool googleTranslation;
   final String id, title, path, state;
   final String translation;
   final TranslationStyle translationStyle;
@@ -127,6 +132,7 @@ class Recording {
   final List<Segment> segments;
   final List<Map<String, dynamic>> summary;
   Recording({
+    this.googleTranslation = false,
     required this.id,
     required this.title,
     required this.path,
@@ -150,6 +156,7 @@ class Recording {
     'targetLanguage': targetLanguage,
     'state': state,
     'translation': translation,
+    'googleTranslation': googleTranslation,
     'translationStyle': translationStyle.name,
     'revision': revision,
     'created': created.toIso8601String(),
@@ -178,6 +185,7 @@ class Recording {
     targetLanguage: j['targetLanguage'] ?? 'en-US',
     state: j['state'],
     translation: j['translation'] ?? '',
+    googleTranslation: j['googleTranslation'] == true,
     translationStyle:
         TranslationStyle.values
             .where((s) => s.name == j['translationStyle'])

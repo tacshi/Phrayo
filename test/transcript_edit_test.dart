@@ -25,6 +25,8 @@ Recording sample() => Recording(
   title: 'Original title',
   path: 'sample/audio.m4a',
   seconds: 6,
+  sourceLanguage: 'en-US',
+  targetLanguage: 'zh-CN',
   translation: 'Old translation',
   translationStyle: TranslationStyle.polite,
   summary: [

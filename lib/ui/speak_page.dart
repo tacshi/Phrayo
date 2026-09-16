@@ -14,6 +14,9 @@ import 'common.dart';
 import 'library_page.dart';
 import 'strings.dart';
 import 'speech_button.dart';
+import 'translation_attribution.dart';
+
+import 'package:flutter/foundation.dart';
 
 class SpeakPage extends ConsumerStatefulWidget {
   const SpeakPage({super.key});
@@ -26,6 +29,7 @@ enum _RecordingEnd { finish, discard }
 class _SpeakPageState extends ConsumerState<SpeakPage> {
   final input = TextEditingController();
   String output = '', explanation = '';
+  bool googleTranslation = false;
   TranslationStyle style = TranslationStyle.standard;
   String? sessionId, audioPath, finalAppliedId, editedSessionId;
   int revision = 0;
@@ -110,6 +114,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     cancellation?.cancel();
     setState(() {
       output = '';
+      googleTranslation = false;
       explanation = '';
       busy = false;
     });
@@ -153,6 +158,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         audioPath = null;
         input.text = '';
         output = '';
+        googleTranslation = false;
         explanation = '';
       });
       native.sessionChanged(current);
@@ -244,6 +250,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     cancellation?.cancel();
     input.clear();
     output = '';
+    googleTranslation = false;
     explanation = '';
     audioPath = null;
     finalAppliedId = null;
@@ -271,7 +278,12 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
             style: settings.usesTextModel ? style : TranslationStyle.standard,
             cancel: token,
           );
-      if (mounted && generation == revision) setState(() => output = result);
+      if (mounted && generation == revision) {
+        setState(() {
+          output = result;
+          googleTranslation = usesGoogleTranslation(settings);
+        });
+      }
     } catch (e) {
       if (mounted && generation == revision && !token.isCancelled) {
         notice(context, errorKey(e));
@@ -322,6 +334,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
             explanation = result;
           } else {
             output = result;
+            googleTranslation = false;
           }
         });
       }
@@ -338,6 +351,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
       id: const Uuid().v4(),
       source: input.text.trim(),
       target: output.trim(),
+      googleTranslation: googleTranslation,
       sourceLanguage: settings.source,
       targetLanguage: settings.target,
       recordingId: sessionId,
@@ -398,6 +412,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
             cancellation?.cancel();
             input.text = '';
             output = '';
+            googleTranslation = false;
             explanation = '';
             busy = false;
           }
@@ -410,6 +425,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
               s.sourceLanguage == current.source &&
               s.targetLanguage == current.target) {
             output = s.translation;
+            googleTranslation = false;
           }
         });
         if (s.state == 'saved' &&
@@ -418,7 +434,9 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
           final settings = ref.read(settingsProvider);
           if (s.sourceLanguage == settings.source &&
               s.targetLanguage == settings.target &&
-              (isCantonese(settings.source) || isCantonese(settings.target))) {
+              (defaultTargetPlatform == TargetPlatform.android ||
+                  isCantonese(settings.source) ||
+                  isCantonese(settings.target))) {
             unawaited(translate());
           }
         }
@@ -551,7 +569,14 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                   input.text.trim().isEmpty
                               ? null
                               : translate,
-                          child: Text(tr(context, 'translate')),
+                          child: Text(
+                            tr(
+                              context,
+                              usesGoogleTranslation(settings)
+                                  ? 'translate_google'
+                                  : 'translate',
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -574,6 +599,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(height: 1.4),
                           ),
+                          if (googleTranslation) const TranslationAttribution(),
                           const SizedBox(height: 20),
                           Wrap(
                             spacing: 8,

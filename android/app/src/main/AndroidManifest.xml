@@ -1,0 +1,28 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <application android:label="Phrayo" android:name="${applicationName}" android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:usesCleartextTraffic="false">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop"
+            android:taskAffinity="" android:theme="@style/LaunchTheme" android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+        </activity>
+        <service android:name=".MediaSessionService" android:exported="false" android:foregroundServiceType="microphone|mediaPlayback" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.files" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/share_paths" />
+        </provider>
+        <meta-data android:name="flutterEmbedding" android:value="2" />
+    </application>
+    <queries>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+        <intent><action android:name="android.intent.action.PROCESS_TEXT" /><data android:mimeType="text/plain" /></intent>
+    </queries>
+</manifest>

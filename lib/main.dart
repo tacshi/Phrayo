@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +15,15 @@ import 'ui/strings.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    LicenseRegistry.addLicense(() async* {
+      final licenses = await const MethodChannel('app.capyvibe.phrayo/android')
+          .invokeMapMethod<String, String>('licenses');
+      for (final entry in (licenses ?? <String, String>{}).entries) {
+        yield LicenseEntryWithLineBreaks([entry.key], entry.value);
+      }
+    });
+  }
   runApp(const ProviderScope(child: PhrayoApp()));
 }
 

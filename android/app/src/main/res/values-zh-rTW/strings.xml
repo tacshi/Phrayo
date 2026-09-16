@@ -1,0 +1,11 @@
+<resources>
+    <string name="audio_channel">錄音與播放</string>
+    <string name="recording">正在錄音</string>
+    <string name="playing">正在播放</string>
+    <string name="pause">暫停</string>
+    <string name="resume">繼續</string>
+    <string name="stop">停止</string>
+    <string name="start_speaking">開始說話</string>
+    <string name="microphone_ready">麥克風已就緒，請再次開始說話。</string>
+    <string name="shortcut_failed">請開啟 Phrayo 檢查麥克風權限並開始錄音。</string>
+</resources>

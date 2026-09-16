@@ -8,6 +8,7 @@ import '../core/languages.dart';
 import '../core/providers.dart';
 import 'common.dart';
 import 'strings.dart';
+import 'translation_attribution.dart';
 import 'transcript_editor.dart';
 
 Future<bool> deleteRecording(
@@ -603,6 +604,7 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
       await db.replaceIfCurrent(r.id, r.revision, {
         ...r.toJson(),
         'translation': result,
+        'googleTranslation': usesGoogleTranslation(settings),
         'translationStyle': style.name,
         'revision': r.revision + 1,
       });
@@ -640,6 +642,7 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
           id: const Uuid().v4(),
           source: translationSource(r),
           target: r.translation.trim(),
+          googleTranslation: r.googleTranslation,
           sourceLanguage: r.sourceLanguage,
           targetLanguage: r.targetLanguage,
           recordingId: r.id,
@@ -1195,7 +1198,15 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                             child: Text(
                               tr(
                                 context,
-                                r.translation.isEmpty
+                                usesGoogleTranslation(
+                                      AppSettings.fromJson({
+                                        ...ref.watch(settingsProvider).toJson(),
+                                        'source': r.sourceLanguage,
+                                        'target': r.targetLanguage,
+                                      }),
+                                    )
+                                    ? 'translate_google'
+                                    : r.translation.isEmpty
                                     ? 'translate'
                                     : 'retranslate',
                               ),
@@ -1219,6 +1230,7 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                     style: Theme.of(context).textTheme.bodyLarge
                         ?.copyWith(height: 1.65),
                   ),
+                  if (r.googleTranslation) const TranslationAttribution(),
                   const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerLeft,

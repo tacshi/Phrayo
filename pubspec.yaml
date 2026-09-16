@@ -71,6 +71,8 @@ flutter:
   uses-material-design: true
   assets:
     - Phrayo.png
+    - assets/google_translate/color.png
+    - assets/google_translate/white.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

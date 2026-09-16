@@ -132,6 +132,7 @@ class AppDatabase extends _$AppDatabase {
             'title': trimmed.join(' '),
             'segments': segments,
             'translation': '',
+            'googleTranslation': false,
             'summary': <dynamic>[],
             'revision': original.revision + 1,
           },
