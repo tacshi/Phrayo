@@ -104,6 +104,18 @@ void main() {
         );
         bridge.sessionChanged(session);
         await tester.pumpAndSettle();
+        // With a text model the default style is Conversational, so the
+        // transcript is translated in that style instead of showing the plain
+        // live translation.
+        expect(
+          find.text(model ? 'Conversational' : 'Standard'),
+          findsOneWidget,
+        );
+        expect(
+          find.text(model ? 'Model translation' : 'Old translation'),
+          findsOneWidget,
+        );
+        expect(processor.requests, [if (model) '识别错误']);
         final input = find.byType(TextField);
         await tester.enterText(input, '修正后的文字');
         await tester.pumpAndSettle();
@@ -124,7 +136,10 @@ void main() {
           find.text(model ? 'Model translation' : 'Corrected translation'),
           findsOneWidget,
         );
-        expect(model ? processor.requests : api.requests, ['修正后的文字']);
+        expect(model ? processor.requests : api.requests, [
+          if (model) '识别错误',
+          '修正后的文字',
+        ]);
         expect(model ? api.requests : processor.requests, isEmpty);
         await tester.ensureVisible(input);
         await tester.enterText(input, '   ');

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:phrayo/core/llm_provider.dart';
 import 'package:phrayo/core/models.dart';
 import 'package:phrayo/core/providers.dart';
 import 'package:phrayo/data/database.dart';
@@ -12,7 +13,49 @@ import 'package:phrayo/ui/recordings_page.dart';
 
 import 'transcript_edit_test.dart' show sample, EditNative;
 
+class _ModelSettings extends SettingsController {
+  @override
+  AppSettings build() =>
+      const AppSettings(provider: LlmProvider.openAi, model: 'model');
+}
+
 void main() {
+  testWidgets('a plain recording translation suggests Conversational next', (
+    tester,
+  ) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    final native = NativeBridge(api: EditNative());
+    final recording = Recording.fromJson({
+      ...sample().toJson(),
+      'translationStyle': TranslationStyle.standard.name,
+    });
+    await tester.runAsync(() => db.insertRecording(recording));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          nativeProvider.overrideWithValue(native),
+          settingsProvider.overrideWith(_ModelSettings.new),
+        ],
+        child: const MaterialApp(home: RecordingDetail(id: 'sample')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Tab).at(1));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(TranslationStylePicker),
+        matching: find.text('Conversational'),
+      ),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await native.dispose();
+    await tester.runAsync(db.close);
+  });
+
   for (final layout in ['phone', 'tablet', 'Hans', 'Hant']) {
     testWidgets('translation controls stay in one padded row on $layout', (
       tester,

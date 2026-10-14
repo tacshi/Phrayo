@@ -111,6 +111,10 @@ enum TranslationStyle {
   polite,
   concise;
 
+  /// The style new translations start with. Without a text model, translation
+  /// is always [standard], the only style system translation has.
+  static const preferred = conversational;
+
   String get prompt => switch (this) {
     standard => 'Use natural, neutral language.',
     conversational => 'Use conversational, everyday language.',

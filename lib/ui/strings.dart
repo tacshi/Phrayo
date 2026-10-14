@@ -84,7 +84,7 @@ const words = <String, List<String>>{
   'translated_text': ['Translation', '译文', '譯文'],
   'retranslate': ['Translate again', '重新翻译', '重新翻譯'],
   'translation_style': ['Translation style', '翻译风格', '翻譯風格'],
-  'style_standard': ['Default', '默认', '預設'],
+  'style_standard': ['Standard', '标准', '標準'],
   'style_conversational': ['Conversational', '口语化', '口語化'],
   'style_professional': ['Professional', '专业化', '專業化'],
   'style_polite': ['Polite', '礼貌', '禮貌'],
