@@ -389,7 +389,9 @@ class ReleaseScriptTest(unittest.TestCase):
         self.assert_ok(self.run_script('release_testflight.sh', '2.3.4', '5'))
         build = self.calls('flutter')[0]
         self.assertEqual(build['args'], ['build', 'ipa', '--release', '--target', 'lib/main.dart',
-                                        '--build-name', '2.3.4', '--build-number', '5'])
+                                        '--build-name', '2.3.4', '--build-number', '5',
+                                        '--export-options-plist',
+                                        str(self.root / 'ios/ExportOptions.plist')])
         self.assertEqual(build['developer_dir'], self.env['DEVELOPER_DIR'])
         upload = self.publishes()[0]['args']
         self.assertEqual(upload[upload.index('--group') + 1], 'GROUP-1')

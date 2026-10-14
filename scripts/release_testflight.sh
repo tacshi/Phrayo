@@ -111,8 +111,11 @@ shopt -s nullglob
 OLD_IPAS=("$ROOT_DIR"/build/ios/ipa/*.ipa)
 if [[ ${#OLD_IPAS[@]} -gt 0 ]]; then rm -f "${OLD_IPAS[@]}"; fi
 step "Building Phrayo $VERSION ($BUILD_NUMBER)"
+# Export with the named App Store profiles. Automatic signing only finds
+# Xcode-managed profiles, which need an Apple account signed in to Xcode.
 flutter build ipa --release --target lib/main.dart \
-  --build-name "$VERSION" --build-number "$BUILD_NUMBER"
+  --build-name "$VERSION" --build-number "$BUILD_NUMBER" \
+  --export-options-plist "$ROOT_DIR/ios/ExportOptions.plist"
 
 IPAS=("$ROOT_DIR"/build/ios/ipa/*.ipa)
 [[ ${#IPAS[@]} -eq 1 ]] || die "Expected one IPA in build/ios/ipa, found ${#IPAS[@]}. Check the archive export and signing for both targets."
