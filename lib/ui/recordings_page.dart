@@ -559,6 +559,14 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
   final selected = <String>{};
   String? speaker;
   TranslationStyle? translationStyle;
+
+  /// A plain translation suggests the preferred style for the next one; a
+  /// style picked for this recording before is kept.
+  TranslationStyle styleFor(Recording r) =>
+      translationStyle ??
+      (r.translationStyle == TranslationStyle.standard
+          ? TranslationStyle.preferred
+          : r.translationStyle);
   bool busy = false;
   bool selecting = false;
   int tab = 0;
@@ -586,7 +594,7 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
       'target': r.targetLanguage,
     });
     final style = settings.usesTextModel
-        ? translationStyle ?? r.translationStyle
+        ? styleFor(r)
         : TranslationStyle.standard;
     final token = CancelToken();
     cancellation = token;
@@ -1173,7 +1181,7 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                       children: [
                         Expanded(
                           child: TranslationStylePicker(
-                            value: translationStyle ?? r.translationStyle,
+                            value: styleFor(r),
                             settings: ref.watch(settingsProvider),
                             onChanged: busy
                                 ? null

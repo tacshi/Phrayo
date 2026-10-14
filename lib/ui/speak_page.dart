@@ -30,7 +30,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
   final input = TextEditingController();
   String output = '', explanation = '';
   bool googleTranslation = false;
-  TranslationStyle style = TranslationStyle.standard;
+  TranslationStyle style = TranslationStyle.preferred;
   String? sessionId, audioPath, finalAppliedId, editedSessionId;
   int revision = 0;
   bool busy = false, starting = false, saving = false, finishing = false;
@@ -258,6 +258,10 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     busy = false;
   }
 
+  /// Styles need a text model; system translation is always standard.
+  TranslationStyle effectiveStyle(AppSettings settings) =>
+      settings.usesTextModel ? style : TranslationStyle.standard;
+
   Future<void> translate() async {
     final text = input.text.trim();
     if (text.isEmpty || busy || starting || finishing || changingLanguage) {
@@ -275,7 +279,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
           .translate(
             text,
             settings,
-            style: settings.usesTextModel ? style : TranslationStyle.standard,
+            style: effectiveStyle(settings),
             cancel: token,
           );
       if (mounted && generation == revision) {
@@ -420,7 +424,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
           audioPath = s.path;
           if (s.transcript.isNotEmpty) input.text = s.transcript;
           final current = ref.read(settingsProvider);
-          if (style == TranslationStyle.standard &&
+          if (effectiveStyle(current) == TranslationStyle.standard &&
               s.translation.isNotEmpty &&
               s.sourceLanguage == current.source &&
               s.targetLanguage == current.target) {
@@ -428,15 +432,18 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
             googleTranslation = false;
           }
         });
-        if (s.state == 'saved' &&
-            s.translation.isEmpty &&
-            s.transcript.isNotEmpty) {
+        if (s.state == 'saved' && s.transcript.isNotEmpty) {
           final settings = ref.read(settingsProvider);
+          // A styled translation comes from the text model, so it replaces
+          // the plain live translation without waiting for Translate.
+          final styled = effectiveStyle(settings) != TranslationStyle.standard;
           if (s.sourceLanguage == settings.source &&
               s.targetLanguage == settings.target &&
-              (defaultTargetPlatform == TargetPlatform.android ||
-                  isCantonese(settings.source) ||
-                  isCantonese(settings.target))) {
+              (styled ||
+                  (s.translation.isEmpty &&
+                      (defaultTargetPlatform == TargetPlatform.android ||
+                          isCantonese(settings.source) ||
+                          isCantonese(settings.target))))) {
             unawaited(translate());
           }
         }
@@ -450,7 +457,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
               previous.localOnly != next.localOnly ||
               previous.provider != next.provider ||
               previous.model != next.model)) {
-        if (!next.usesTextModel) style = TranslationStyle.standard;
+        if (!next.usesTextModel) style = TranslationStyle.preferred;
         changed();
       }
     });
@@ -606,7 +613,9 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                           Row(
                             spacing: 8,
                             children: [
+                              // Audio controls carry the longest labels.
                               Flexible(
+                                flex: 3,
                                 child: SpeechButton(
                                   text: output,
                                   language: settings.target,
@@ -645,6 +654,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                 ),
                               ),
                               Flexible(
+                                flex: 2,
                                 child: TextButton(
                                   onPressed: busy
                                       ? null

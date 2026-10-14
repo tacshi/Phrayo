@@ -10,6 +10,7 @@ import 'strings.dart';
 
 /// Prepares only the completed, visible translation. The native preparation
 /// fills the same bounded local cache used by Listen, without playing audio.
+/// Unless automatic generation is on, preparation waits for Generate audio.
 class SpeechButton extends ConsumerStatefulWidget {
   final String text, language;
   final bool enabled;
@@ -29,10 +30,20 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
   int generation = 0;
   bool preparing = false, failed = false, startingPlayback = false;
 
+  /// Audio for the current text and language is ready in the cache.
+  bool prepared = false;
+  bool get automatic => ref.read(settingsProvider).autoGenerateVoice;
+
   @override
   void initState() {
     super.initState();
     api = ref.read(nativeProvider).api;
+    ref.listenManual(settingsProvider.select((s) => s.autoGenerateVoice), (
+      previous,
+      next,
+    ) {
+      if (next && !prepared && !preparing) generate();
+    });
     unawaited(prepare());
   }
 
@@ -56,13 +67,17 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
     super.dispose();
   }
 
-  Future<void> prepare() async {
+  /// Without [requested], audio is only prepared when generation is automatic.
+  Future<void> prepare({bool requested = false}) async {
     final request = ++generation;
     if (startingPlayback) {
       startingPlayback = false;
       unawaited(api.stopPlayback().catchError((Object _) {}));
     }
-    if (!widget.enabled || widget.text.trim().isEmpty) {
+    prepared = false;
+    if (!widget.enabled ||
+        widget.text.trim().isEmpty ||
+        !(requested || automatic)) {
       preparing = false;
       failed = false;
       await api.cancelSpeechPreparation().catchError((Object _) {});
@@ -72,6 +87,7 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
     failed = false;
     try {
       await api.prepareSpeech(widget.text, widget.language);
+      if (mounted && request == generation) prepared = true;
     } catch (_) {
       if (mounted && request == generation) failed = true;
     } finally {
@@ -79,6 +95,15 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
         setState(() => preparing = false);
       }
     }
+  }
+
+  void generate() {
+    if (!widget.enabled || widget.text.trim().isEmpty) return;
+    setState(() {
+      preparing = true;
+      failed = false;
+    });
+    unawaited(prepare(requested: true));
   }
 
   Future<void> listen() async {
@@ -90,6 +115,8 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
     });
     try {
       await api.speak(widget.text, widget.language);
+      // Speaking fills the same cache that preparation does.
+      if (mounted && request == generation) prepared = true;
     } catch (error) {
       if (mounted && request == generation) {
         failed = true;
@@ -140,6 +167,25 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
         onPressed: widget.enabled ? listen : null,
         icon: const Icon(Icons.refresh_rounded),
         label: Text(tr(context, 'retry_speech')),
+      );
+    }
+    final automatic = ref.watch(
+      settingsProvider.select((s) => s.autoGenerateVoice),
+    );
+    if (!prepared && !automatic) {
+      return TextButton.icon(
+        key: const ValueKey('generate-speech'),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        onPressed: widget.enabled ? generate : null,
+        icon: const Icon(Icons.graphic_eq_rounded),
+        // Wraps like "Translate with Google" rather than truncating.
+        label: Text(
+          tr(context, 'generate_speech'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
       );
     }
     return IconButton(

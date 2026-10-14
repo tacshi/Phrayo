@@ -84,7 +84,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Hello');
       await tester.pumpAndSettle();
-      final button = find.widgetWithText(TextButton, 'Translate');
+      // The label names Google on Android, so find the button by its key.
+      final button = find.byKey(const ValueKey('translate-speech'));
       final picker = find.byType(TranslationStylePicker);
       expect(tester.widget<TextButton>(button).onPressed, isNotNull);
       expect(

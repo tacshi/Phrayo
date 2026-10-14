@@ -7,12 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
 import '../core/transcription_terms.dart';
-import '../services/moss.dart';
-import '../core/llm_provider.dart';
 import '../core/languages.dart';
-import '../core/native.g.dart';
 import '../core/providers.dart';
 import 'common.dart';
+import 'settings_services.dart';
+import 'settings_widgets.dart';
 import 'strings.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -22,115 +21,129 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  late String source, target, locale;
-  late bool localOnly;
-  late SttProvider sttProvider;
-  late List<String> transcriptionTerms;
   bool busy = false;
   String? operation;
-  CapabilityMessage? capabilities;
-  LlmProvider? provider;
-  String selectedModel = '';
-  List<String> models = const [];
-  bool connectionTested = false;
   double? ttsFraction;
   StreamSubscription<double?>? ttsSub;
   String voiceStatus = 'checking';
   int voiceRevision = 0;
-  final soniox = TextEditingController(), llm = TextEditingController();
-  final connectionControllers = {
-    for (final service in ['stt', 'llm']) service: ExpansibleController(),
-  };
+  bool? sttKeySaved, llmKeySaved;
+  bool get android => defaultTargetPlatform == TargetPlatform.android;
+
   @override
   void initState() {
     super.initState();
-    final s = ref.read(settingsProvider);
-    source = s.source;
-    target = s.target;
-    locale = s.locale;
-    localOnly = s.localOnly;
-    sttProvider = s.sttProvider;
-    transcriptionTerms = s.transcriptionTerms;
-    provider = s.provider;
-    selectedModel = s.model;
-    ref.listenManual(settingsProvider, (previous, next) {
-      final sourceChanged =
-          previous?.source != next.source && source != next.source;
-      final targetChanged =
-          previous?.target != next.target && target != next.target;
-      if (!sourceChanged && !targetChanged) return;
-      setState(() {
-        if (sourceChanged) source = next.source;
-        if (targetChanged) {
-          target = next.target;
-          voiceStatus = 'checking';
-        }
-        capabilities = null;
-      });
-      if (targetChanged) unawaited(refreshVoice());
+    ref.listenManual(settingsProvider.select((s) => s.target), (
+      previous,
+      next,
+    ) {
+      if (previous == next) return;
+      setState(() => voiceStatus = 'checking');
+      unawaited(refreshVoice());
     });
+    ref.listenManual(
+      settingsProvider.select((s) => (s.sttProvider, s.provider)),
+      (previous, next) {
+        if (previous != next) unawaited(loadKeys());
+      },
+    );
     ttsSub = ref.read(nativeProvider).ttsDownloadProgress.listen((f) {
       if (!mounted) return;
       setState(() => ttsFraction = f);
       if (f == null) unawaited(refreshVoice());
     });
     unawaited(refreshVoice());
+    unawaited(loadKeys());
   }
 
   @override
   void dispose() {
     ttsSub?.cancel();
-    soniox.dispose();
-    llm.dispose();
-    for (final controller in connectionControllers.values) {
-      controller.dispose();
-    }
     super.dispose();
   }
 
-  AppSettings get settings => AppSettings(
-    source: source,
-    target: target,
-    locale: locale,
-    localOnly: localOnly,
-    sttProvider: sttProvider,
-    transcriptionTerms: transcriptionTerms,
-    provider: provider,
-    model: selectedModel,
-  );
-  Future<void> save({bool includeLlm = true}) async {
-    final saved = ref.read(settingsProvider);
-    final llmChanged =
-        provider != saved.provider ||
-        selectedModel != saved.model ||
-        llm.text.trim().isNotEmpty;
-    if (includeLlm && llmChanged) {
-      if (!connectionTested) throw StateError('test_before_model');
-      if (!models.contains(selectedModel)) throw StateError('model_missing');
-    }
-    if (includeLlm && llm.text.trim().isNotEmpty) {
-      await ref
-          .read(textProcessorProvider)
-          .credentials
-          .save(provider!, llm.text.trim());
-    }
-    await ref
+  Future<void> update(Map<String, Object?> changes) => action(
+    context,
+    () => ref
         .read(settingsProvider.notifier)
         .save(
-          includeLlm
-              ? settings
-              : AppSettings(
-                  source: source,
-                  target: target,
-                  locale: locale,
-                  localOnly: localOnly,
-                  sttProvider: sttProvider,
-                  transcriptionTerms: transcriptionTerms,
-                  provider: saved.provider,
-                  model: saved.model,
-                ),
+          AppSettings.fromJson({
+            ...ref.read(settingsProvider).toJson(),
+            ...changes,
+          }),
+        ),
+  );
+
+  /// Row values only need to know whether a key exists, never its value.
+  Future<void> loadKeys() async {
+    final s = ref.read(settingsProvider);
+    Future<bool> saved(Future<String?> Function() read) async {
+      try {
+        final value = await read();
+        return value != null && value.isNotEmpty;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    final stt = await saved(
+      () => ref.read(nativeProvider).api.readSecret(s.sttProvider.secret),
+    );
+    final llm =
+        s.provider != null &&
+        await saved(
+          () => ref.read(textProcessorProvider).credentials.read(s.provider!),
         );
-    if (includeLlm) llm.clear();
+    if (mounted) {
+      setState(() {
+        sttKeySaved = stt;
+        llmKeySaved = llm;
+      });
+    }
+  }
+
+  Future<void> openPage(Widget page) async {
+    await pushSettingsPage<void>(context, page);
+    if (mounted) await loadKeys();
+  }
+
+  Future<void> pickLanguage(String label, String field, String current) async {
+    final choices = {
+      ...languages,
+      if (!languages.containsKey(current)) current: current,
+    };
+    final picked = await pushSettingsPage<String>(
+      context,
+      SettingsChoicePage<String>(
+        title: tr(context, label),
+        options: [for (final e in choices.entries) (e.key, e.value)],
+        selected: current,
+      ),
+    );
+    if (picked != null && picked != current && mounted) {
+      await update({field: picked});
+    }
+  }
+
+  List<(String, String)> appLanguages(BuildContext context) => [
+    ('', tr(context, 'system')),
+    ('en', 'English'),
+    ('zh-Hans', '简体中文'),
+    ('zh-Hant', '繁體中文'),
+  ];
+
+  Future<void> pickAppLanguage(String current) async {
+    final picked = await pushSettingsPage<String>(
+      context,
+      SettingsChoicePage<String>(
+        title: tr(context, 'app_language'),
+        options: appLanguages(context),
+        selected: current,
+      ),
+    );
+    if (picked != null && picked != current && mounted) {
+      await update({'locale': picked});
+    }
   }
 
   Future<void> editVocabulary() async {
@@ -138,7 +151,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       barrierDismissible: false,
       builder: (_) => _VocabularyDialog(
-        terms: transcriptionTerms,
+        terms: ref.read(settingsProvider).transcriptionTerms,
         onSave: (terms) async {
           final current = ref.read(settingsProvider);
           await ref
@@ -149,37 +162,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   'transcriptionTerms': terms,
                 }),
               );
-          if (mounted) {
-            setState(() {
-              transcriptionTerms = terms;
-              capabilities = null;
-            });
-          }
         },
       ),
     );
   }
 
-  Future<void> check({bool prepare = false}) async {
-    setState(() {
-      busy = true;
-      operation = prepare ? 'prepare' : 'check';
-    });
-    await action(context, () async {
-      await save(includeLlm: false);
-      final api = ref.read(nativeProvider).api;
-      if (prepare) {
-        await api.prepareLanguages(source, target, transcriptionTerms);
-      }
-      final c = await api.capabilities(source, target, transcriptionTerms);
-      if (mounted) setState(() => capabilities = c);
-    });
-    if (mounted) setState(() => busy = false);
-  }
+  Future<void> showShortcutHelp() => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(
+        tr(dialogContext, android ? 'android_shortcut' : 'action_button'),
+      ),
+      content: Text(
+        tr(dialogContext, android ? 'android_shortcut_help' : 'action_help'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: Text(tr(dialogContext, 'done')),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(dialogContext);
+            action(context, () => ref.read(nativeProvider).api.openSettings());
+          },
+          child: Text(tr(dialogContext, 'open_settings')),
+        ),
+      ],
+    ),
+  );
 
   Future<void> refreshVoice() async {
     final revision = ++voiceRevision;
-    final language = target;
+    final language = ref.read(settingsProvider).target;
     String status;
     try {
       status = await ref
@@ -190,7 +205,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     } catch (_) {
       status = 'unavailable';
     }
-    if (mounted && revision == voiceRevision && language == target) {
+    if (mounted &&
+        revision == voiceRevision &&
+        language == ref.read(settingsProvider).target) {
       setState(() => voiceStatus = status);
     }
   }
@@ -201,10 +218,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       operation = 'voice';
       ttsFraction = 0;
     });
-    await action(context, () async {
-      await save(includeLlm: false);
-      await ref.read(nativeProvider).api.prepareTts([target]);
-    });
+    await action(
+      context,
+      () => ref.read(nativeProvider).api.prepareTts([
+        ref.read(settingsProvider).target,
+      ]),
+    );
     if (!mounted) return;
     setState(() {
       busy = false;
@@ -223,14 +242,43 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       () => ref
           .read(nativeProvider)
           .api
-          .previewTts(target, voiceStatus == 'ready'),
+          .previewTts(
+            ref.read(settingsProvider).target,
+            voiceStatus == 'ready',
+          ),
     );
     if (!mounted) return;
     setState(() => busy = false);
     await refreshVoice();
   }
 
-  Widget voiceControls() {
+  /// A full-width action row inside the voice card, aligned with its title.
+  Widget voiceAction({
+    Key? key,
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+  }) => TextButton(
+    key: key,
+    onPressed: onPressed,
+    style: TextButton.styleFrom(
+      alignment: AlignmentDirectional.centerStart,
+      minimumSize: const Size.fromHeight(52),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+      shape: const RoundedRectangleBorder(),
+    ),
+    child: Row(
+      children: [
+        SizedBox(width: SettingsIcon.width, child: Icon(icon, size: 22)),
+        const SizedBox(width: 12),
+        Flexible(child: Text(label)),
+      ],
+    ),
+  );
+
+  Widget voiceGroup(AppSettings s) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final downloading = voiceStatus == 'downloading' || ttsFraction != null;
     final checking = voiceStatus == 'checking';
     final status = switch (voiceStatus) {
@@ -240,121 +288,102 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       'downloading' => 'downloading',
       _ => 'system_voice',
     };
-    return Column(
+    return SettingsGroup(
       key: const ValueKey('listening-voice'),
-      crossAxisAlignment: CrossAxisAlignment.start,
+      title: tr(context, 'listening_voice'),
+      dividerIndent: SettingsTile.iconIndent,
       children: [
-        SectionLabel(tr(context, 'listening_voice')),
-        if (!checking) Text(tr(context, status)),
-        if (downloading || (busy && operation == 'preview'))
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: LinearProgressIndicator(
-              value: downloading ? ttsFraction : null,
-            ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const SettingsIcon(Icons.volume_up_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // A quiet placeholder while the status loads, never a
+                    // visible "checking" step.
+                    checking
+                        ? Container(
+                            width: 120,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: colors.onSurface.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          )
+                        : Text(
+                            tr(context, status),
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                    if (downloading || (busy && operation == 'preview'))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: LinearProgressIndicator(
+                          value: downloading ? ttsFraction : null,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            TextButton.icon(
-              key: const ValueKey('preview-voice'),
-              onPressed:
-                  busy ||
-                      downloading ||
-                      checking ||
-                      voiceStatus == 'repair' ||
-                      voiceStatus == 'unavailable'
-                  ? null
-                  : previewVoice,
-              icon: const Icon(Icons.volume_up_outlined),
-              label: Text(tr(context, 'preview_voice')),
+        ),
+        voiceAction(
+          key: const ValueKey('preview-voice'),
+          icon: Icons.play_arrow_rounded,
+          label: tr(context, 'preview_voice'),
+          onPressed:
+              busy ||
+                  downloading ||
+                  checking ||
+                  voiceStatus == 'repair' ||
+                  voiceStatus == 'unavailable'
+              ? null
+              : previewVoice,
+        ),
+        if (voiceStatus == 'download' || voiceStatus == 'repair')
+          voiceAction(
+            key: const ValueKey('download-voice'),
+            icon: Icons.download_outlined,
+            label: tr(
+              context,
+              voiceStatus == 'repair' ? 'repair_voice' : 'neural_download',
             ),
-            if (voiceStatus == 'download' || voiceStatus == 'repair')
-              TextButton(
-                key: const ValueKey('download-voice'),
-                onPressed: busy || downloading ? null : downloadNeural,
-                child: Text(
-                  tr(
-                    context,
-                    voiceStatus == 'repair'
-                        ? 'repair_voice'
-                        : 'neural_download',
-                  ),
-                ),
-              ),
-            if (downloading)
-              TextButton(
-                onPressed: () => action(
-                  context,
-                  () => ref.read(nativeProvider).api.cancelTts(),
-                ),
-                child: Text(tr(context, 'cancel')),
-              ),
-            if (voiceStatus == 'unavailable')
-              TextButton(
-                onPressed: busy ? null : refreshVoice,
-                child: Text(tr(context, 'retry')),
-              ),
-          ],
+            onPressed: busy || downloading ? null : downloadNeural,
+          ),
+        if (downloading)
+          voiceAction(
+            icon: Icons.close_rounded,
+            label: tr(context, 'cancel'),
+            onPressed: () =>
+                action(context, () => ref.read(nativeProvider).api.cancelTts()),
+          ),
+        if (voiceStatus == 'unavailable')
+          voiceAction(
+            icon: Icons.refresh,
+            label: tr(context, 'retry'),
+            onPressed: busy ? null : refreshVoice,
+          ),
+        SettingsTile(
+          key: const ValueKey('auto-speech'),
+          icon: Icons.auto_mode_outlined,
+          title: tr(context, 'auto_speech'),
+          subtitle: tr(context, 'auto_speech_help'),
+          enabled: !busy,
+          trailing: Switch(
+            value: s.autoGenerateVoice,
+            onChanged: busy
+                ? null
+                : (value) => update({'autoGenerateVoice': value}),
+          ),
+          onTap: () => update({'autoGenerateVoice': !s.autoGenerateVoice}),
         ),
       ],
     );
-  }
-
-  Future<void> test(bool cloud) async {
-    setState(() {
-      busy = true;
-      operation = cloud ? sttProvider.secret : 'llm';
-      if (!cloud) {
-        connectionTested = false;
-        models = const [];
-      }
-    });
-    await action(context, () async {
-      if (localOnly) throw StateError('online_required');
-      if (cloud) {
-        final candidate = soniox.text.trim();
-        final key = candidate.isNotEmpty
-            ? candidate
-            : await ref.read(nativeProvider).api.readSecret(sttProvider.secret);
-        if (key == null || key.isEmpty) {
-          throw StateError('${sttProvider.secret}_missing');
-        }
-        await validateSttKey(ref.read(sttClientProvider), sttProvider, key);
-        if (candidate.isNotEmpty) {
-          await ref
-              .read(nativeProvider)
-              .api
-              .saveSecret(sttProvider.secret, candidate);
-          soniox.clear();
-        }
-      } else {
-        final available = await ref
-            .read(textProcessorProvider)
-            .listModels(settings, candidateApiKey: llm.text);
-        if (!mounted) return;
-        setState(() {
-          models = available;
-          connectionTested = true;
-          if (!models.contains(selectedModel)) selectedModel = '';
-        });
-        if (selectedModel.isNotEmpty) await save();
-      }
-      if (mounted) notice(context, cloud ? 'connected' : 'models_loaded');
-    });
-    if (mounted) setState(() => busy = false);
-  }
-
-  Future<void> commit({bool includeLlm = false}) async {
-    setState(() {
-      busy = true;
-      operation = 'save';
-    });
-    await action(context, () async {
-      await save(includeLlm: includeLlm);
-    });
-    if (mounted) setState(() => busy = false);
   }
 
   Future<void> clearData() async {
@@ -371,6 +400,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ['recording', 'paused', 'processing'].contains(current.state)) {
           throw StateError('recording_active');
         }
+        final settings = ref.read(settingsProvider);
         final jobs = await ref.read(databaseProvider).list('job');
         for (final j in jobs) {
           await ref
@@ -391,469 +421,168 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         if (mounted) Navigator.pop(context);
       } finally {
         if (mounted) setState(() => busy = false);
+        unawaited(loadKeys());
       }
     });
   }
 
-  InputDecoration settingDecoration(String label) => InputDecoration(
-    labelText: tr(context, label),
-    filled: false,
-    border: UnderlineInputBorder(
-      borderSide: BorderSide(
-        color: Theme.of(context).colorScheme.outlineVariant,
-      ),
-    ),
-    enabledBorder: UnderlineInputBorder(
-      borderSide: BorderSide(
-        color: Theme.of(context).colorScheme.outlineVariant,
-      ),
-    ),
-    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-  );
+  String? sttValue(AppSettings s) => switch (sttKeySaved) {
+    null => null,
+    true => s.sttProvider.label,
+    false => tr(context, 'not_set_up'),
+  };
 
-  Widget language(String label, String value, void Function(String) update) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: DropdownButtonFormField<String>(
-          key: ValueKey('$label-$value'),
-          initialValue: value,
-          isExpanded: true,
-          decoration: settingDecoration(label),
-          items: languages.entries
-              .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
-              .toList(),
-          onChanged: busy
-              ? null
-              : (value) {
-                  if (value != null) {
-                    setState(() {
-                      update(value);
-                      capabilities = null;
-                    });
-                    commit();
-                    if (label == 'target_language') {
-                      setState(() => voiceStatus = 'checking');
-                      unawaited(refreshVoice());
-                    }
-                  }
-                },
-        ),
-      );
-
-  Widget connectionForm(String service) {
-    final controller = service != 'llm' ? soniox : llm;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 16),
-      child: Column(
-        children: [
-          if (service != 'llm') ...[
-            DropdownButtonFormField<SttProvider>(
-              key: const ValueKey('stt-provider-select'),
-              initialValue: sttProvider,
-              isExpanded: true,
-              decoration: InputDecoration(labelText: tr(context, 'model')),
-              items: [
-                for (final value in SttProvider.values)
-                  DropdownMenuItem(value: value, child: Text(value.label)),
-              ],
-              onChanged: busy
-                  ? null
-                  : (value) {
-                      if (value == null || value == sttProvider) return;
-                      setState(() {
-                        sttProvider = value;
-                        soniox.clear();
-                      });
-                      commit();
-                    },
-            ),
-            if (sttProvider == SttProvider.mossPro)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(tr(context, 'moss_after_stop')),
-              ),
-            const SizedBox(height: 16),
-          ],
-          if (service == 'llm') ...[
-            DropdownButtonFormField<LlmProvider>(
-              key: const ValueKey('provider-select'),
-              initialValue: provider,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: tr(context, 'llm_provider'),
-              ),
-              hint: Text(tr(context, 'select_provider')),
-              items: [
-                for (final value in LlmProvider.values)
-                  DropdownMenuItem(value: value, child: Text(value.label)),
-              ],
-              onChanged: busy
-                  ? null
-                  : (value) {
-                      if (value == provider) return;
-                      setState(() {
-                        provider = value;
-                        llm.clear();
-                        invalidateModels();
-                      });
-                    },
-            ),
-            const SizedBox(height: 16),
-          ],
-          TextField(
-            key: ValueKey('provider-key-$service'),
-            controller: controller,
-            enabled: !busy && (service != 'llm' || provider != null),
-            obscureText: true,
-            autocorrect: false,
-            enableSuggestions: false,
-            onChanged: service == 'llm'
-                ? (_) => setState(invalidateModels)
-                : null,
-            decoration: InputDecoration(
-              labelText: tr(context, 'api_key'),
-              helperText: tr(
-                context,
-                service == 'llm' ? 'keep_provider_key' : 'keep_key',
-              ),
-              helperMaxLines: 3,
-            ),
-          ),
-          if (busy && operation == service)
-            const Padding(
-              padding: EdgeInsets.only(top: 16),
-              child: LinearProgressIndicator(),
-            ),
-          Row(
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    key: ValueKey('test-$service'),
-                    onPressed:
-                        busy ||
-                            localOnly ||
-                            (service == 'llm' && provider == null)
-                        ? null
-                        : () => test(service != 'llm'),
-                    child: Text(tr(context, 'test')),
-                  ),
-                ),
-              ),
-              PopupMenuButton<String>(
-                tooltip: tr(context, 'more'),
-                enabled: !busy && (service != 'llm' || provider != null),
-                onSelected: (_) => removeKey(service),
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: 'remove',
-                    child: Text(tr(context, 'remove_key')),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          if (service == 'llm') ...[
-            const SizedBox(height: 8),
-            if (connectionTested)
-              DropdownButtonFormField<String>(
-                key: const ValueKey('provider-model'),
-                initialValue: models.contains(selectedModel)
-                    ? selectedModel
-                    : null,
-                isExpanded: true,
-                menuMaxHeight: 360,
-                decoration: InputDecoration(labelText: tr(context, 'model')),
-                hint: Text(tr(context, 'select_model')),
-                items: [
-                  for (final model in models)
-                    DropdownMenuItem(
-                      value: model,
-                      child: Text(
-                        model,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-                onChanged: busy
-                    ? null
-                    : (value) {
-                        setState(() => selectedModel = value ?? '');
-                        commit(includeLlm: true);
-                      },
-              )
-            else
-              InputDecorator(
-                key: const ValueKey('provider-model-locked'),
-                decoration: InputDecoration(
-                  labelText: tr(context, 'model'),
-                  helperText: selectedModel.isEmpty
-                      ? null
-                      : tr(context, 'test_before_model'),
-                  helperMaxLines: 3,
-                ),
-                child: Text(
-                  selectedModel.isEmpty
-                      ? tr(context, 'test_before_model')
-                      : selectedModel,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-          ],
-        ],
-      ),
-    );
+  String? textModelValue(AppSettings s) {
+    if (llmKeySaved == null) return null;
+    if (llmKeySaved! && s.provider != null && s.model.trim().isNotEmpty) {
+      return '${s.provider!.label} · ${s.model}';
+    }
+    return tr(context, 'not_set_up');
   }
-
-  void invalidateModels() {
-    connectionTested = false;
-    models = const [];
-    selectedModel = '';
-  }
-
-  Future<void> removeKey(String service) async {
-    setState(() => busy = true);
-    await action(context, () async {
-      if (service == 'llm') {
-        await ref.read(textProcessorProvider).credentials.save(provider!, '');
-        if (!mounted) return;
-        setState(() {
-          llm.clear();
-          connectionTested = false;
-          models = const [];
-        });
-      } else {
-        await ref.read(nativeProvider).api.saveSecret(service, '');
-        soniox.clear();
-      }
-      if (mounted) notice(context, 'key_removed');
-    });
-    if (mounted) setState(() => busy = false);
-  }
-
-  Widget resourceAction({required bool prepare}) {
-    final label = prepare ? 'prepare' : 'check';
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      enabled: !busy,
-      title: Text(tr(context, label)),
-      trailing: busy && operation == label
-          ? const SizedBox.square(
-              dimension: 24,
-              child: Padding(
-                padding: EdgeInsets.all(2),
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          : Icon(prepare ? Icons.download_outlined : Icons.refresh),
-      onTap: busy ? null : () => check(prepare: prepare),
-    );
-  }
-
-  Widget capabilityRow(String label, String status) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Row(
-      children: [
-        Expanded(child: Text(tr(context, label))),
-        Flexible(
-          child: Text(
-            tr(context, status),
-            textAlign: TextAlign.end,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(tr(context, 'settings'))),
-    body: PageBody(
-      children: [
-        Text(
-          tr(context, 'languages'),
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        language('source_language', source, (s) => source = s),
-        language('target_language', target, (s) => target = s),
-        DropdownButtonFormField<String>(
-          initialValue: locale,
-          isExpanded: true,
-          decoration: settingDecoration('app_language'),
-          items: [
-            DropdownMenuItem(value: '', child: Text(tr(context, 'system'))),
-            const DropdownMenuItem(value: 'en', child: Text('English')),
-            const DropdownMenuItem(value: 'zh-Hans', child: Text('简体中文')),
-            const DropdownMenuItem(value: 'zh-Hant', child: Text('繁體中文')),
-          ],
-          onChanged: busy
-              ? null
-              : (value) {
-                  setState(() => locale = value ?? '');
-                  commit();
-                },
-        ),
-        voiceControls(),
-        SectionLabel(tr(context, 'mode')),
-        RadioGroup<bool>(
-          groupValue: localOnly,
-          onChanged: (value) {
-            if (!busy && value != null) {
-              setState(() => localOnly = value);
-              commit();
-            }
-          },
-          child: Column(
+  Widget build(BuildContext context) {
+    final s = ref.watch(settingsProvider);
+    final terms = s.transcriptionTerms;
+    const indent = SettingsTile.iconIndent;
+    return Scaffold(
+      appBar: AppBar(title: Text(tr(context, 'settings'))),
+      body: PageBody(
+        children: [
+          SettingsGroup(
+            title: tr(context, 'languages'),
+            dividerIndent: indent,
             children: [
-              RadioListTile<bool>(
-                value: false,
-                title: Text(tr(context, 'automatic')),
-                contentPadding: EdgeInsets.zero,
+              SettingsTile(
+                icon: Icons.record_voice_over_outlined,
+                title: tr(context, 'source_language'),
+                value: languages[s.source] ?? s.source,
                 enabled: !busy,
+                onTap: () =>
+                    pickLanguage('source_language', 'source', s.source),
               ),
-              RadioListTile<bool>(
-                value: true,
-                title: Text(tr(context, 'local')),
-                subtitle: Text(
-                  tr(
-                    context,
-                    defaultTargetPlatform == TargetPlatform.android
-                        ? 'android_local_services'
-                        : 'local_services',
-                  ),
-                ),
-                contentPadding: EdgeInsets.zero,
+              SettingsTile(
+                icon: Icons.translate,
+                title: tr(context, 'target_language'),
+                value: languages[s.target] ?? s.target,
                 enabled: !busy,
+                onTap: () =>
+                    pickLanguage('target_language', 'target', s.target),
+              ),
+              SettingsTile(
+                icon: Icons.language,
+                title: tr(context, 'app_language'),
+                value: appLanguages(context)
+                    .firstWhere(
+                      (e) => e.$1 == s.locale,
+                      orElse: () => appLanguages(context).first,
+                    )
+                    .$2,
+                enabled: !busy,
+                onTap: () => pickAppLanguage(s.locale),
               ),
             ],
           ),
-        ),
-        SectionLabel(tr(context, 'connections')),
-        Column(
-          children: [
-            for (final service in ['stt', 'llm']) ...[
-              ExpansionTile(
-                controller: connectionControllers[service],
-                maintainState: true,
-                tilePadding: EdgeInsets.zero,
-                shape: const Border(),
-                collapsedShape: const Border(),
-                title: Text(tr(context, service)),
-                subtitle: Text(
-                  service == 'stt'
-                      ? sttProvider.label
-                      : tr(context, 'text_actions'),
+          voiceGroup(s),
+          SettingsGroup(
+            title: tr(context, 'mode'),
+            dividerIndent: indent,
+            children: [
+              SettingsTile(
+                icon: Icons.cloud_off_outlined,
+                title: tr(context, 'local'),
+                subtitle: tr(
+                  context,
+                  android ? 'android_local_services' : 'local_services',
                 ),
-                onExpansionChanged: (expanded) {
-                  if (!expanded) return;
-                  for (final other in connectionControllers.entries) {
-                    if (other.key != service) other.value.collapse();
-                  }
-                },
-                children: [
-                  connectionForm(
-                    service == 'stt' ? sttProvider.secret : service,
-                  ),
-                ],
+                enabled: !busy,
+                trailing: Switch(
+                  value: s.localOnly,
+                  onChanged: busy
+                      ? null
+                      : (value) => update({'localOnly': value}),
+                ),
+                onTap: () => update({'localOnly': !s.localOnly}),
               ),
-              if (service == 'stt') const Divider(height: 1),
+              SettingsTile(
+                icon: Icons.graphic_eq,
+                title: tr(context, 'stt'),
+                value: sttValue(s),
+                enabled: !busy,
+                onTap: () => openPage(const SttSettingsPage()),
+              ),
+              SettingsTile(
+                icon: Icons.auto_awesome_outlined,
+                title: tr(context, 'llm'),
+                value: textModelValue(s),
+                enabled: !busy,
+                onTap: () => openPage(const TextModelSettingsPage()),
+              ),
+              SettingsTile(
+                key: const ValueKey('custom-vocabulary'),
+                icon: Icons.spellcheck,
+                title: tr(context, 'custom_vocabulary'),
+                value: terms.isEmpty
+                    ? tr(context, 'none')
+                    : tr(
+                        context,
+                        'term_count',
+                      ).replaceAll('{count}', '${terms.length}'),
+                enabled: !busy,
+                onTap: editVocabulary,
+              ),
+              SettingsTile(
+                icon: Icons.download_for_offline_outlined,
+                title: tr(context, 'resources'),
+                enabled: !busy,
+                onTap: () => openPage(const OfflineResourcesPage()),
+              ),
             ],
-          ],
-        ),
-        ListTile(
-          key: const ValueKey('custom-vocabulary'),
-          contentPadding: EdgeInsets.zero,
-          title: Text(tr(context, 'custom_vocabulary')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: busy ? null : editVocabulary,
-        ),
-        SectionLabel(tr(context, 'resources')),
-        if (capabilities != null) ...[
-          if (transcriptionTerms.isNotEmpty &&
-              capabilities!.vocabularySupported == false)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(tr(context, 'vocabulary_unavailable')),
-            ),
-          capabilityRow(
-            'transcript',
-            capabilities!.speechStatus ?? 'unsupported',
           ),
-          capabilityRow(
-            'translation',
-            capabilities!.translationStatus == 'installed'
-                ? 'ready'
-                : capabilities!.translationStatus,
+          SettingsGroup(
+            dividerIndent: indent,
+            children: [
+              SettingsTile(
+                icon: Icons.touch_app_outlined,
+                title: tr(
+                  context,
+                  android ? 'android_shortcut' : 'action_button',
+                ),
+                onTap: showShortcutHelp,
+              ),
+              if (android)
+                SettingsTile(
+                  icon: Icons.description_outlined,
+                  title: MaterialLocalizations.of(context).licensesPageTitle,
+                  onTap: () => showLicensePage(
+                    context: context,
+                    applicationName: 'Phrayo',
+                  ),
+                ),
+            ],
+          ),
+          SettingsGroup(
+            title: tr(context, 'data'),
+            children: [
+              SettingsTile(
+                icon: Icons.delete_outline,
+                title: tr(context, 'clear'),
+                destructive: true,
+                enabled: !busy,
+                trailing: busy && operation == 'data'
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
+                onTap: clearData,
+              ),
+            ],
           ),
         ],
-        resourceAction(prepare: false),
-        resourceAction(prepare: true),
-        const SizedBox(height: 16),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          childrenPadding: const EdgeInsets.only(bottom: 16),
-          shape: const Border(),
-          collapsedShape: const Border(),
-          title: Text(
-            tr(
-              context,
-              defaultTargetPlatform == TargetPlatform.android
-                  ? 'android_shortcut'
-                  : 'action_button',
-            ),
-          ),
-          children: [
-            Text(
-              tr(
-                context,
-                defaultTargetPlatform == TargetPlatform.android
-                    ? 'android_shortcut_help'
-                    : 'action_help',
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => action(
-                  context,
-                  () => ref.read(nativeProvider).api.openSettings(),
-                ),
-                child: Text(tr(context, 'open_settings')),
-              ),
-            ),
-          ],
-        ),
-        SectionLabel(tr(context, 'data')),
-        if (defaultTargetPlatform == TargetPlatform.android)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(MaterialLocalizations.of(context).licensesPageTitle),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () =>
-                showLicensePage(context: context, applicationName: 'Phrayo'),
-          ),
-        if (busy && operation == 'data') const LinearProgressIndicator(),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: busy ? null : clearData,
-            child: Text(
-              tr(context, 'clear'),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _VocabularyDialog extends StatefulWidget {

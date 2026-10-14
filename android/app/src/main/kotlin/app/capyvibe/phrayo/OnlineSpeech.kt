@@ -99,22 +99,40 @@ internal class SonioxStream(key: String, source: String, target: String, terms: 
             return config
         }
         private fun render(tokens: List<JSONObject>): SpeechResult {
-            val text = StringBuilder(); val translation = StringBuilder(); val segments = mutableListOf<SegmentMessage>()
-            tokens.forEachIndexed { index, token ->
+            val text = StringBuilder(); val translation = StringBuilder()
+            tokens.forEach { token ->
                 val value = token.optString("text")
                 if (!value.startsWith("<")) {
                     if (token.optString("translation_status") == "translation") translation.append(value)
-                    else {
-                        text.append(value)
-                        val start = token.optDouble("start_ms"); val end = token.optDouble("end_ms")
-                        if (start.isFinite() && end.isFinite() && start >= 0 && end >= start) {
-                            segments.add(SegmentMessage("token-$index", value, start / 1000, end / 1000,
-                                if (token.isNull("speaker")) null else token.get("speaker").toString()))
-                        }
-                    }
+                    else text.append(value)
                 }
             }
-            return SpeechResult(text.toString(), translation.toString(), segments)
+            return SpeechResult(text.toString(), translation.toString(), segments(tokens))
+        }
+        private val sentenceEnd = Regex("[。！？.!?]\\s*$")
+        // Chinese and Japanese tokens are often single characters, so group them into sentences.
+        // Keep the boundaries aligned with sonioxSegments in services/transcription.dart.
+        fun segments(tokens: List<JSONObject>): List<SegmentMessage> {
+            val result = mutableListOf<SegmentMessage>()
+            val text = StringBuilder(); var start: Double? = null; var end = 0.0; var speaker: String? = null
+            fun flush() {
+                val value = text.trim().toString()
+                start?.let { if (value.isNotEmpty()) result.add(SegmentMessage("segment-${result.size}", value, it, end, speaker)) }
+                text.clear(); start = null
+            }
+            for (token in tokens) {
+                val value = token.optString("text")
+                if (value.startsWith("<") || token.optString("translation_status") == "translation") continue
+                val from = token.optDouble("start_ms"); val to = token.optDouble("end_ms")
+                if (!from.isFinite() || !to.isFinite() || from < 0 || to < from) continue
+                val who = if (token.isNull("speaker")) null else token.get("speaker").toString()
+                if (start != null && (who != speaker || from / 1000 - end > 1.5)) flush()
+                speaker = who; if (start == null) start = from / 1000; end = to / 1000
+                text.append(value)
+                if (sentenceEnd.containsMatchIn(value)) flush()
+            }
+            flush()
+            return result
         }
     }
 }

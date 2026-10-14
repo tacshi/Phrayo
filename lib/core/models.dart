@@ -111,6 +111,10 @@ enum TranslationStyle {
   polite,
   concise;
 
+  /// The style new translations start with. Without a text model, translation
+  /// is always [standard], the only style system translation has.
+  static const preferred = conversational;
+
   String get prompt => switch (this) {
     standard => 'Use natural, neutral language.',
     conversational => 'Use conversational, everyday language.',
@@ -208,6 +212,10 @@ class AppSettings {
   final SttProvider sttProvider;
   final bool localOnly;
   final List<String> transcriptionTerms;
+
+  /// Off by default: on-device synthesis is heavy, so translation audio is
+  /// generated only when asked for unless this is turned on.
+  final bool autoGenerateVoice;
   const AppSettings({
     this.source = 'zh-CN',
     this.target = 'en-US',
@@ -217,6 +225,7 @@ class AppSettings {
     this.model = '',
     this.localOnly = false,
     this.transcriptionTerms = const [],
+    this.autoGenerateVoice = false,
   });
   bool get usesTextModel =>
       !localOnly && provider != null && model.trim().isNotEmpty;
@@ -230,6 +239,7 @@ class AppSettings {
     'model': model,
     'localOnly': localOnly,
     'transcriptionTerms': transcriptionTerms,
+    'autoGenerateVoice': autoGenerateVoice,
   };
   factory AppSettings.fromJson(Map<String, dynamic> j) {
     final provider = j.containsKey('provider')
@@ -246,6 +256,7 @@ class AppSettings {
       transcriptionTerms: List<String>.unmodifiable(
         (j['transcriptionTerms'] as List? ?? const []).cast<String>(),
       ),
+      autoGenerateVoice: j['autoGenerateVoice'] == true,
     );
   }
 }

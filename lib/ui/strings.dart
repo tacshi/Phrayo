@@ -84,7 +84,7 @@ const words = <String, List<String>>{
   'translated_text': ['Translation', '译文', '譯文'],
   'retranslate': ['Translate again', '重新翻译', '重新翻譯'],
   'translation_style': ['Translation style', '翻译风格', '翻譯風格'],
-  'style_standard': ['Default', '默认', '預設'],
+  'style_standard': ['Standard', '标准', '標準'],
   'style_conversational': ['Conversational', '口语化', '口語化'],
   'style_professional': ['Professional', '专业化', '專業化'],
   'style_polite': ['Polite', '礼貌', '禮貌'],
@@ -103,6 +103,13 @@ const words = <String, List<String>>{
   'preparing_audio': ['Preparing microphone…', '正在准备麦克风…', '正在準備麥克風…'],
   'preparing_speech': ['Preparing audio…', '正在准备语音…', '正在準備語音…'],
   'retry_speech': ['Retry audio', '重试语音', '重試語音'],
+  'generate_speech': ['Generate audio', '生成语音', '生成語音'],
+  'auto_speech': ['Generate audio automatically', '自动生成语音', '自動生成語音'],
+  'auto_speech_help': [
+    'Prepare audio as soon as a translation appears. Uses more battery.',
+    '译文出现后立即准备语音，会更耗电。',
+    '譯文出現後立即準備語音，會更耗電。',
+  ],
   'clear_search': ['Clear search', '清空搜索', '清空搜尋'],
   'no_search_results': ['No matching expressions', '没有找到相关表达', '沒有找到相關表達'],
   'review_due_count': [
@@ -141,7 +148,6 @@ const words = <String, List<String>>{
   'reference_expression': ['Reference expression', '参考表达', '參考表達'],
   'answer_by_speaking': ['Say it yourself', '自己说', '自己說'],
   'try_speaking_again': ['Say it again', '再说一次', '再說一次'],
-  'connections': ['Service connections', '服务连接', '服務連線'],
   'online_transcription': ['Online transcription', '在线转写', '線上轉寫'],
   'text_actions': [
     'Translation, rewriting, key points and practice feedback',
@@ -253,7 +259,6 @@ const words = <String, List<String>>{
   'app_language': ['App language', '界面语言', '介面語言'],
   'system': ['System', '跟随系统', '跟隨系統'],
   'mode': ['Speech and translation services', '语音与翻译服务', '語音與翻譯服務'],
-  'automatic': ['Use configured online services', '使用已配置的在线服务', '使用已設定的線上服務'],
   'local': ['On device only', '仅本地', '僅本機'],
   'stt': ['STT model', '语音转文字模型', '語音轉文字模型'],
   'moss_after_stop': [
@@ -290,7 +295,6 @@ const words = <String, List<String>>{
   'api_key': ['API key', 'API Key', 'API Key'],
   'llm': ['Text model', '文字模型', '文字模型'],
   'llm_provider': ['Provider', '服务商', '服務商'],
-  'select_provider': ['Choose a provider', '选择服务商', '選擇服務商'],
   'provider_missing': [
     'Choose a provider in Settings.',
     '请在设置中选择服务商。',
@@ -322,6 +326,15 @@ const words = <String, List<String>>{
     '留空使用此服務商已儲存的金鑰',
   ],
   'remove_key': ['Remove saved key', '删除已保存的密钥', '刪除已儲存的金鑰'],
+  'key_saved': ['Key saved', '已保存密钥', '已儲存金鑰'],
+  'not_set_up': ['Not set up', '未设置', '未設定'],
+  'none': ['None', '无', '無'],
+  'term_count': ['{count} terms', '{count} 个词', '{count} 個詞'],
+  'local_only_on': [
+    'Turn off On device only to test online services.',
+    '关闭「仅本地」后才能测试在线服务。',
+    '關閉「僅本機」後才能測試線上服務。',
+  ],
   'resources': ['Offline resources', '离线资源', '離線資源'],
   'prepare': ['Prepare selected languages', '准备所选语言', '準備所選語言'],
   'ready': ['Ready', '已就绪', '已就緒'],
