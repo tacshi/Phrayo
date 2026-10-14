@@ -141,7 +141,6 @@ const words = <String, List<String>>{
   'reference_expression': ['Reference expression', '参考表达', '參考表達'],
   'answer_by_speaking': ['Say it yourself', '自己说', '自己說'],
   'try_speaking_again': ['Say it again', '再说一次', '再說一次'],
-  'connections': ['Service connections', '服务连接', '服務連線'],
   'online_transcription': ['Online transcription', '在线转写', '線上轉寫'],
   'text_actions': [
     'Translation, rewriting, key points and practice feedback',
@@ -253,7 +252,6 @@ const words = <String, List<String>>{
   'app_language': ['App language', '界面语言', '介面語言'],
   'system': ['System', '跟随系统', '跟隨系統'],
   'mode': ['Speech and translation services', '语音与翻译服务', '語音與翻譯服務'],
-  'automatic': ['Use configured online services', '使用已配置的在线服务', '使用已設定的線上服務'],
   'local': ['On device only', '仅本地', '僅本機'],
   'stt': ['STT model', '语音转文字模型', '語音轉文字模型'],
   'moss_after_stop': [
@@ -290,7 +288,6 @@ const words = <String, List<String>>{
   'api_key': ['API key', 'API Key', 'API Key'],
   'llm': ['Text model', '文字模型', '文字模型'],
   'llm_provider': ['Provider', '服务商', '服務商'],
-  'select_provider': ['Choose a provider', '选择服务商', '選擇服務商'],
   'provider_missing': [
     'Choose a provider in Settings.',
     '请在设置中选择服务商。',
@@ -322,6 +319,15 @@ const words = <String, List<String>>{
     '留空使用此服務商已儲存的金鑰',
   ],
   'remove_key': ['Remove saved key', '删除已保存的密钥', '刪除已儲存的金鑰'],
+  'key_saved': ['Key saved', '已保存密钥', '已儲存金鑰'],
+  'not_set_up': ['Not set up', '未设置', '未設定'],
+  'none': ['None', '无', '無'],
+  'term_count': ['{count} terms', '{count} 个词', '{count} 個詞'],
+  'local_only_on': [
+    'Turn off On device only to test online services.',
+    '关闭「仅本地」后才能测试在线服务。',
+    '關閉「僅本機」後才能測試線上服務。',
+  ],
   'resources': ['Offline resources', '离线资源', '離線資源'],
   'prepare': ['Prepare selected languages', '准备所选语言', '準備所選語言'],
   'ready': ['Ready', '已就绪', '已就緒'],

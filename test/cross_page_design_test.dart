@@ -170,7 +170,7 @@ void main() {
     await tester.pumpAndSettle();
   });
   testWidgets(
-    'settings expands one provider form at a time and keeps Action Button help collapsed',
+    'settings rows open each connection on its own page at large text sizes',
     (tester) async {
       tester.view.physicalSize = const Size(320, 844);
       tester.view.devicePixelRatio = 1;
@@ -193,44 +193,33 @@ void main() {
       await tester.tap(find.byIcon(Icons.settings_outlined));
       await tester.pumpAndSettle();
       expect(find.byType(SegmentedButton<bool>), findsNothing);
-      expect(
-        find.byKey(const ValueKey('provider-key-soniox')).hitTestable(),
-        findsNothing,
-      );
-      await tester.scrollUntilVisible(
-        find.text('STT model'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('STT model'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('provider-key-soniox')),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('provider-key-soniox')).hitTestable(),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.text('Text model'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Text model'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const ValueKey('provider-select')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('provider-select')).hitTestable(),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('provider-key-soniox')).hitTestable(),
-        findsNothing,
-      );
+      expect(find.byType(ExpansionTile), findsNothing);
+      expect(find.byKey(const ValueKey('provider-key-soniox')), findsNothing);
+      for (final (row, field) in [
+        ('STT model', 'provider-key-soniox'),
+        ('Text model', 'provider-key-llm'),
+      ]) {
+        await tester.scrollUntilVisible(
+          find.text(row),
+          250,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(row));
+        await tester.pumpAndSettle();
+        expect(find.byType(NavigationBar), findsNothing);
+        await tester.scrollUntilVisible(
+          find.byKey(ValueKey(field)),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey(field)).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), null);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(find.byType(NavigationBar), findsOneWidget);
+      }
       expect(tester.takeException(), null);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();

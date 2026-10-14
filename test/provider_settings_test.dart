@@ -92,7 +92,8 @@ class _Harness {
     await db.close();
   }
 
-  Future<void> open(WidgetTester tester) async {
+  /// Opens Settings, then the sub-page behind the row titled [page].
+  Future<void> open(WidgetTester tester, {String? page = 'Text model'}) async {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
@@ -100,12 +101,13 @@ class _Harness {
       ),
     );
     await tester.pumpAndSettle();
+    if (page == null) return;
     await tester.scrollUntilVisible(
-      find.text('Text model'),
+      find.text(page),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    await _tap(tester, find.text('Text model'));
+    await _tap(tester, find.text(page));
   }
 }
 
@@ -117,8 +119,13 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> _chooseProvider(WidgetTester tester, String label) async {
-  await _tap(tester, find.byKey(const ValueKey('provider-select')));
-  await _tap(tester, find.text(label).last);
+  await _tap(
+    tester,
+    find.descendant(
+      of: find.byKey(const ValueKey('provider-select')),
+      matching: find.text(label),
+    ),
+  );
 }
 
 Future<void> _key(WidgetTester tester, String key) async {
@@ -135,13 +142,11 @@ void main() {
       final h = _Harness();
       addTearDown(h.dispose);
       h.api.secrets['soniox'] = 'saved-soniox';
-      await h.open(tester);
-      await _tap(tester, find.text('STT model'));
+      await h.open(tester, page: 'STT model');
       final sonioxField = find.byKey(const ValueKey('provider-key-soniox'));
       await tester.ensureVisible(sonioxField);
       await tester.enterText(sonioxField, 'unsaved-soniox');
-      await _tap(tester, find.byKey(const ValueKey('stt-provider-select')));
-      await _tap(tester, find.text('MOSS Pro').last);
+      await _tap(tester, find.byKey(const ValueKey('stt-provider-mossPro')));
       expect(
         h.container.read(settingsProvider).sttProvider,
         SttProvider.mossPro,
@@ -165,8 +170,7 @@ void main() {
       expect(h.api.secrets['moss'], 'candidate-moss');
       expect(h.api.secrets['soniox'], 'saved-soniox');
       expect(h.requests.last.uri.toString(), 'https://api.mosi.cn/v1/models');
-      await _tap(tester, find.byKey(const ValueKey('stt-provider-select')));
-      await _tap(tester, find.text('Soniox').last);
+      await _tap(tester, find.byKey(const ValueKey('stt-provider-soniox')));
       expect(
         h.container.read(settingsProvider).sttProvider,
         SttProvider.soniox,
@@ -174,8 +178,8 @@ void main() {
       expect(h.api.secrets['moss'], 'candidate-moss');
       expect(tester.widget<TextField>(sonioxField).controller!.text, isEmpty);
       await _tap(tester, find.byKey(const ValueKey('test-soniox')));
-      await _tap(tester, find.byType(PopupMenuButton<String>).hitTestable());
       await _tap(tester, find.text('Remove saved key'));
+      expect(find.text('Remove saved key'), findsNothing);
       expect(h.api.secrets['soniox'], '');
       expect(h.api.secrets['moss'], 'candidate-moss');
     },
@@ -212,12 +216,14 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       await _tap(tester, find.text(title));
-      await _tap(tester, find.byKey(const ValueKey('stt-provider-select')));
-      await _tap(tester, find.text('MOSS Pro').last);
+      await _tap(tester, find.byKey(const ValueKey('stt-provider-mossPro')));
       expect(
         h.container.read(settingsProvider).sttProvider,
         SttProvider.mossPro,
       );
+      expect(tester.takeException(), isNull);
+      await _tap(tester, find.byType(BackButton));
+      expect(find.text('MOSS Pro'), findsNothing);
       await _tap(tester, find.byKey(const ValueKey('custom-vocabulary')));
       expect(
         find.descendant(
@@ -239,10 +245,10 @@ void main() {
   testWidgets('mode changes persist without Save', (tester) async {
     final h = _Harness();
     addTearDown(h.dispose);
-    await h.open(tester);
+    await h.open(tester, page: null);
     await tester.scrollUntilVisible(
       find.text('On device only'),
-      -150,
+      150,
       scrollable: find.byType(Scrollable).first,
     );
     await _tap(tester, find.text('On device only'));
@@ -444,7 +450,6 @@ void main() {
       await h.open(tester);
       expect(find.byKey(const ValueKey('provider-base')), findsNothing);
       expect(find.byKey(const ValueKey('provider-model')), findsNothing);
-      await _tap(tester, find.byKey(const ValueKey('provider-select')));
       for (final label in [
         'OpenAI',
         'OpenRouter',
@@ -457,7 +462,7 @@ void main() {
       for (final label in ['Custom', 'Ollama', 'LM Studio']) {
         expect(find.text(label), findsNothing);
       }
-      await _tap(tester, find.text('DeepSeek').last);
+      await _chooseProvider(tester, 'DeepSeek');
       await _key(tester, 'draft-key');
       expect(find.text('Save'), findsNothing);
       expect(h.container.read(settingsProvider).provider, isNull);
@@ -482,6 +487,11 @@ void main() {
       );
       await tester.pumpWidget(const SizedBox.shrink());
       await h.open(tester);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('provider-model-locked')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.byKey(const ValueKey('provider-model')), findsNothing);
       expect(find.text('model-b'), findsOneWidget);
       await _tap(tester, find.byKey(const ValueKey('test-llm')));
@@ -550,7 +560,6 @@ void main() {
     await h.open(tester);
     await _tap(tester, find.byKey(const ValueKey('test-llm')));
     expect(find.byKey(const ValueKey('provider-model')), findsOneWidget);
-    await _tap(tester, find.byType(PopupMenuButton<String>).last);
     await _tap(tester, find.text('Remove saved key'));
     expect(find.byKey(const ValueKey('provider-model')), findsNothing);
     expect(await h.processor.credentials.read(LlmProvider.deepSeek), isNull);

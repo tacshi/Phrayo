@@ -161,14 +161,9 @@ void main() {
       expect(saved['transcriptionTerms'], ['Phrayo']);
       await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('source_language-en-GB')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('target_language-ja-JP')),
-        findsOneWidget,
-      );
+      // The Speak tab is offstage here, so these are the Settings rows.
+      expect(find.text('English (UK)'), findsOneWidget);
+      expect(find.text('日本語'), findsOneWidget);
       expect(h.api.voiceChecks.last, 'ja-JP');
       await tester.tap(find.text('Speak'));
       await tester.pumpAndSettle();

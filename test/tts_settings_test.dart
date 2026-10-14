@@ -218,9 +218,9 @@ void main() {
     );
     await tester.pump();
     await tester.tap(find.text('English (US)'));
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.ensureVisible(find.text('Deutsch').last);
-    await tester.tap(find.text('Deutsch').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Deutsch'));
+    await tester.tap(find.text('Deutsch'));
     await tester.pumpAndSettle();
     pending.complete('ready');
     await tester.pumpAndSettle();

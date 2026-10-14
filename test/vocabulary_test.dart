@@ -32,6 +32,9 @@ class VocabularyNative extends PhrayoNative {
   }
 
   @override
+  Future<String> ttsStatus(String language) async => 'ready';
+
+  @override
   Future<String?> readSecret(String service) async {
     secretReads++;
     return 'test';
