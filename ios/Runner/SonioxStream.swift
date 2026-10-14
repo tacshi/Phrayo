@@ -96,21 +96,50 @@ import Foundation
   private func render(_ tokens: [[String: Any]]) {
     var source = ""
     var target = ""
-    var segments = [SegmentMessage]()
-    for (index, t) in tokens.enumerated() {
+    for t in tokens {
       guard let text = t["text"] as? String, !text.hasPrefix("<") else { continue }
       if t["translation_status"] as? String == "translation" {
         target += text
       } else {
         source += text
-        if let start = t["start_ms"] as? Double, let end = t["end_ms"] as? Double {
-          segments.append(
-            SegmentMessage(
-              id: "token-\(index)", text: text, start: start / 1000, end: end / 1000,
-              speaker: (t["speaker"] as? String)))
-        }
       }
     }
-    onText?(source, target, segments)
+    onText?(source, target, Self.segments(tokens))
+  }
+
+  /// Chinese and Japanese tokens are often single characters, so group them into sentences.
+  /// Keep the boundaries aligned with sonioxSegments in services/transcription.dart.
+  static func segments(_ tokens: [[String: Any]]) -> [SegmentMessage] {
+    var result = [SegmentMessage]()
+    var text = ""
+    var start: Double?
+    var end = 0.0
+    var speaker: String?
+    func flush() {
+      let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      if let start, !trimmed.isEmpty {
+        result.append(
+          SegmentMessage(
+            id: "segment-\(result.count)", text: trimmed, start: start, end: end, speaker: speaker))
+      }
+      text = ""
+      start = nil
+    }
+    for t in tokens {
+      guard let word = t["text"] as? String, !word.hasPrefix("<"),
+        t["translation_status"] as? String != "translation",
+        let from = (t["start_ms"] as? NSNumber)?.doubleValue,
+        let to = (t["end_ms"] as? NSNumber)?.doubleValue
+      else { continue }
+      let who = t["speaker"] as? String
+      if start != nil, who != speaker || from / 1000 - end > 1.5 { flush() }
+      speaker = who
+      start = start ?? from / 1000
+      end = to / 1000
+      text += word
+      if word.range(of: #"[。！？.!?]\s*$"#, options: .regularExpression) != nil { flush() }
+    }
+    flush()
+    return result
   }
 }

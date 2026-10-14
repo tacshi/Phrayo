@@ -30,6 +30,19 @@ class NativeContractsTest {
         assertEquals("Phrayo", source.getJSONObject("context").getJSONArray("terms").getString(0))
         assertTrue(source.getJSONObject("context").getJSONArray("general").toString().contains("Cantonese"))
     }
+    @Test fun liveSonioxCharacterTokensAreGroupedIntoSentences() {
+        val tokens = listOf(
+            "{\"text\":\"我\",\"start_ms\":1000,\"end_ms\":1100}", "{\"text\":\"现\",\"start_ms\":1100,\"end_ms\":1200}",
+            "{\"text\":\"在\",\"start_ms\":1200,\"end_ms\":1300}", "{\"text\":\"Now\",\"translation_status\":\"translation\"}",
+            "{\"text\":\"说\",\"start_ms\":1300,\"end_ms\":1400}", "{\"text\":\"。\",\"start_ms\":1400,\"end_ms\":1450}",
+            "{\"text\":\"好\",\"start_ms\":1500,\"end_ms\":1600,\"speaker\":1}", "{\"text\":\"的\",\"start_ms\":3500,\"end_ms\":3600,\"speaker\":1}",
+            "{\"text\":\"<end>\"}").map { JSONObject(it) }
+        val segments = SonioxStream.segments(tokens)
+        assertEquals(listOf("我现在说。", "好", "的"), segments.map { it.text })
+        assertEquals(1.0, segments.first().start, 0.0)
+        assertEquals(1.45, segments.first().end, 1e-9)
+        assertEquals("1", segments.last().speaker)
+    }
     @Test fun malformedMossTimingFailsInsteadOfFabricatingSegments() {
         for (json in listOf("{\"segments\":[{\"text\":\"hello\",\"start\":3,\"end\":2}]}", "{\"text\":\"hello\"}", "{\"segments\":{}}")) {
             assertThrows(Exception::class.java) { MossTranscription.segments(JSONObject(json)) }

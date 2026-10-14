@@ -55,6 +55,24 @@ final class RunnerTests: XCTestCase {
     XCTAssertNil(empty["translation"])
   }
 
+  @MainActor func testSonioxStreamGroupsCharacterTokensIntoSentences() {
+    let tokens: [[String: Any]] = [
+      ["text": "我", "start_ms": 1000, "end_ms": 1100, "is_final": true],
+      ["text": "现", "start_ms": 1100, "end_ms": 1200, "is_final": true],
+      ["text": "在", "start_ms": 1200, "end_ms": 1300, "is_final": true],
+      ["text": "Now", "translation_status": "translation"],
+      ["text": "说", "start_ms": 1300, "end_ms": 1400, "is_final": true],
+      ["text": "。", "start_ms": 1400, "end_ms": 1450, "is_final": true],
+      ["text": "好", "start_ms": 1500, "end_ms": 1600],
+      ["text": "的", "start_ms": 3500, "end_ms": 3600],
+      ["text": "<end>"],
+    ]
+    let segments = SonioxStream.segments(tokens)
+    XCTAssertEqual(segments.map(\.text), ["我现在说。", "好", "的"])
+    XCTAssertEqual(segments.first?.start, 1)
+    XCTAssertEqual(segments.first?.end, 1.45)
+  }
+
   func testAppleDictionarySelectionAndContext() {
     XCTAssertTrue(
       AppleSpeech.prefersDictation(hasTerms: true, supportsSpeech: true, supportsDictation: true))
