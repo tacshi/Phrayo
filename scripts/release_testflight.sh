@@ -3,8 +3,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_ID="${ASC_APP_ID:-}"
-TESTFLIGHT_GROUP="${ASC_TESTFLIGHT_GROUP:-}"
+# Phrayo's App Store Connect app and internal tester group; the environment
+# can still point a release elsewhere.
+APP_ID="${ASC_APP_ID:-6812285544}"
+TESTFLIGHT_GROUP="${ASC_TESTFLIGHT_GROUP:-Phrayo Internal Testers}"
 TIMEOUT="${ASC_TESTFLIGHT_TIMEOUT:-45m}"
 PREFERRED_XCODE="${PREFERRED_XCODE:-/Applications/Xcode-26.6.0.app/Contents/Developer}"
 
@@ -18,10 +20,11 @@ Usage: scripts/release_testflight.sh <version> <build>
 Build a release IPA and publish to an existing internal TestFlight group.
 Version must use x.y.z; build must be a positive integer.
 
-Required environment:
-  ASC_APP_ID              Phrayo's numeric App Store Connect app ID
-  ASC_TESTFLIGHT_GROUP    One existing internal group name or ID
 Optional environment:
+  ASC_APP_ID              Numeric App Store Connect app ID
+                         (default 6812285544, Phrayo)
+  ASC_TESTFLIGHT_GROUP    One existing internal group name or ID
+                         (default "Phrayo Internal Testers")
   ASC_TESTFLIGHT_TIMEOUT  Upload/processing timeout (default 45m)
   DEVELOPER_DIR           Explicit Xcode Developer directory
   PREFERRED_XCODE         Preferred Xcode when DEVELOPER_DIR is unset
@@ -40,9 +43,9 @@ VERSION="$1"
 BUILD_NUMBER="$2"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Version must use x.y.z format."
 [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || die "Build must be a positive integer."
-[[ "$APP_ID" =~ ^[1-9][0-9]*$ ]] || die "Set ASC_APP_ID to Phrayo's numeric App Store Connect app ID."
-[[ -n "$TESTFLIGHT_GROUP" && "$TESTFLIGHT_GROUP" != *,* ]] ||
-  die "Set ASC_TESTFLIGHT_GROUP to one existing internal group name or ID."
+[[ "$APP_ID" =~ ^[1-9][0-9]*$ ]] || die "ASC_APP_ID must be a numeric App Store Connect app ID."
+[[ "$TESTFLIGHT_GROUP" != *,* ]] ||
+  die "ASC_TESTFLIGHT_GROUP must name one existing internal group, not a list."
 for tool in flutter asc git python3 xcodebuild; do
   command -v "$tool" >/dev/null 2>&1 || die "$tool not found in PATH."
 done

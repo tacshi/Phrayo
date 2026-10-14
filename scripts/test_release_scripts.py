@@ -67,7 +67,7 @@ elif tool == 'asc':
         if os.environ.get('PHRAYO_TEST_AUTH_FAIL'):
             sys.exit(1)
     elif args[:2] == ['apps', 'view']:
-        print(json.dumps(dict(data=dict(id='12345', attributes=dict(
+        print(json.dumps(dict(data=dict(id=args[args.index('--id') + 1], attributes=dict(
             bundleId=os.environ.get('PHRAYO_TEST_ASC_BUNDLE', 'app.capyvibe.phrayo'))))))
     elif args[:3] == ['testflight', 'groups', 'list']:
         print(os.environ['PHRAYO_TEST_GROUPS'])
@@ -335,14 +335,24 @@ class ReleaseScriptTest(unittest.TestCase):
         self.assert_failed(self.run_script('install-apk.sh', '--apk', str(self.apk()), '--all', '--launch'))
         self.assertFalse(self.installs())
 
-    def test_release_validates_arguments_and_required_environment(self):
+    def test_release_validates_arguments_and_environment_overrides(self):
         for args in [('2.3', '5'), ('2.3.4', '0'), ('2.3.4', '-1'), ('2.3.4', '5', 'extra')]:
             self.assert_failed(self.run_script('release_testflight.sh', *args))
-        for key in ('ASC_APP_ID', 'ASC_TESTFLIGHT_GROUP'):
-            value = self.env.pop(key)
-            self.assert_failed(self.run_script('release_testflight.sh', '2.3.4', '5'))
+        for key, value in (('ASC_APP_ID', 'phrayo'), ('ASC_TESTFLIGHT_GROUP', 'A,B')):
+            original = self.env[key]
             self.env[key] = value
+            self.assert_failed(self.run_script('release_testflight.sh', '2.3.4', '5'))
+            self.env[key] = original
         self.assertFalse(self.calls())
+
+    def test_release_defaults_to_phrayo_and_its_internal_group(self):
+        del self.env['ASC_APP_ID'], self.env['ASC_TESTFLIGHT_GROUP']
+        self.env['PHRAYO_TEST_GROUPS'] = json.dumps(dict(data=[dict(id='GROUP-1', attributes=dict(
+            name='Phrayo Internal Testers', isInternalGroup=True))]))
+        self.assert_ok(self.run_script('release_testflight.sh', '2.3.4', '5'))
+        upload = self.publishes()[0]['args']
+        self.assertEqual(upload[upload.index('--app') + 1], '6812285544')
+        self.assertEqual(upload[upload.index('--group') + 1], 'GROUP-1')
 
     def test_dirty_worktree_blocks_release_before_authentication(self):
         self.env['PHRAYO_TEST_DIRTY'] = '?? new-file\n'
