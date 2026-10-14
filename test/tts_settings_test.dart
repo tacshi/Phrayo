@@ -233,6 +233,35 @@ void main() {
     expect(find.text('CosyVoice 3 ready'), findsNothing);
     expect(api.checks, ['en-US', 'de-DE']);
   });
+  testWidgets(
+    'automatic audio generation is off by default and can be enabled',
+    (tester) async {
+      expect(AppSettings.fromJson({}).autoGenerateVoice, isFalse);
+      expect(
+        AppSettings.fromJson(
+          const AppSettings(autoGenerateVoice: true).toJson(),
+        ).autoGenerateVoice,
+        isTrue,
+      );
+      await open(tester, VoiceNative()..status = 'ready');
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SettingsPage)),
+      );
+      expect(container.read(settingsProvider).autoGenerateVoice, isFalse);
+      final toggle = find.byKey(const ValueKey('auto-speech'));
+      await tester.scrollUntilVisible(
+        toggle,
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
+      await tester.tap(find.text('Generate audio automatically'));
+      await tester.pumpAndSettle();
+      expect(container.read(settingsProvider).autoGenerateVoice, isTrue);
+      expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+    },
+  );
   testWidgets('an active voice download can be cancelled and retried', (
     tester,
   ) async {

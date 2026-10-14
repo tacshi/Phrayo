@@ -606,7 +606,9 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                           Row(
                             spacing: 8,
                             children: [
+                              // Audio controls carry the longest labels.
                               Flexible(
+                                flex: 3,
                                 child: SpeechButton(
                                   text: output,
                                   language: settings.target,
@@ -645,6 +647,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                 ),
                               ),
                               Flexible(
+                                flex: 2,
                                 child: TextButton(
                                   onPressed: busy
                                       ? null

@@ -276,7 +276,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ),
   );
 
-  Widget voiceGroup() {
+  Widget voiceGroup(AppSettings s) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final downloading = voiceStatus == 'downloading' || ttsFraction != null;
@@ -368,6 +368,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             label: tr(context, 'retry'),
             onPressed: busy ? null : refreshVoice,
           ),
+        SettingsTile(
+          key: const ValueKey('auto-speech'),
+          icon: Icons.auto_mode_outlined,
+          title: tr(context, 'auto_speech'),
+          subtitle: tr(context, 'auto_speech_help'),
+          enabled: !busy,
+          trailing: Switch(
+            value: s.autoGenerateVoice,
+            onChanged: busy
+                ? null
+                : (value) => update({'autoGenerateVoice': value}),
+          ),
+          onTap: () => update({'autoGenerateVoice': !s.autoGenerateVoice}),
+        ),
       ],
     );
   }
@@ -469,7 +483,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ],
           ),
-          voiceGroup(),
+          voiceGroup(s),
           SettingsGroup(
             title: tr(context, 'mode'),
             dividerIndent: indent,

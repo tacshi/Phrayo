@@ -103,6 +103,13 @@ const words = <String, List<String>>{
   'preparing_audio': ['Preparing microphone…', '正在准备麦克风…', '正在準備麥克風…'],
   'preparing_speech': ['Preparing audio…', '正在准备语音…', '正在準備語音…'],
   'retry_speech': ['Retry audio', '重试语音', '重試語音'],
+  'generate_speech': ['Generate audio', '生成语音', '生成語音'],
+  'auto_speech': ['Generate audio automatically', '自动生成语音', '自動生成語音'],
+  'auto_speech_help': [
+    'Prepare audio as soon as a translation appears. Uses more battery.',
+    '译文出现后立即准备语音，会更耗电。',
+    '譯文出現後立即準備語音，會更耗電。',
+  ],
   'clear_search': ['Clear search', '清空搜索', '清空搜尋'],
   'no_search_results': ['No matching expressions', '没有找到相关表达', '沒有找到相關表達'],
   'review_due_count': [

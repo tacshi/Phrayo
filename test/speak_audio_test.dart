@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:phrayo/core/models.dart';
 import 'package:phrayo/core/native.g.dart';
 import 'package:phrayo/core/providers.dart';
 import 'package:phrayo/data/database.dart';
@@ -44,7 +45,79 @@ class PreparingNative extends PhrayoNative {
   Future<void> stopPlayback() async => stops++;
 }
 
+class _Settings extends SettingsController {
+  _Settings(this.initial);
+  final AppSettings initial;
+  @override
+  AppSettings build() => initial;
+  @override
+  Future<void> save(AppSettings value) async => state = value;
+}
+
+/// The automatic-preparation tests opt in; generation is on request by default.
+final _automatic = settingsProvider.overrideWith(
+  () => _Settings(const AppSettings(autoGenerateVoice: true)),
+);
+
 void main() {
+  testWidgets('translation audio waits for Generate audio unless automatic', (
+    tester,
+  ) async {
+    final api = PreparingNative();
+    final bridge = NativeBridge(api: api);
+    final container = ProviderContainer(
+      overrides: [
+        nativeProvider.overrideWithValue(bridge),
+        settingsProvider.overrideWith(() => _Settings(const AppSettings())),
+      ],
+    );
+    final text = ValueNotifier('Hello.');
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: ValueListenableBuilder<String>(
+              valueListenable: text,
+              builder: (_, value, _) =>
+                  SpeechButton(text: value, language: 'en-US'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(container.read(settingsProvider).autoGenerateVoice, isFalse);
+    expect(api.prepared, isEmpty);
+    expect(find.byTooltip('Listen'), findsNothing);
+    await tester.tap(find.text('Generate audio'));
+    await tester.pump();
+    expect(api.prepared, [('Hello.', 'en-US')]);
+    expect(find.text('Preparing audio…'), findsOneWidget);
+    api.pending.single.complete();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Listen'), findsOneWidget);
+    expect(api.spoken, isEmpty, reason: 'Generating must not play');
+    text.value = 'Hi.';
+    await tester.pumpAndSettle();
+    expect(find.text('Generate audio'), findsOneWidget);
+    expect(api.prepared, hasLength(1));
+    await container
+        .read(settingsProvider.notifier)
+        .save(const AppSettings(autoGenerateVoice: true));
+    await tester.pump();
+    expect(api.prepared.last, ('Hi.', 'en-US'));
+    expect(find.text('Preparing audio…'), findsOneWidget);
+    api.pending.last.complete();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Listen'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    text.dispose();
+    container.dispose();
+    await bridge.dispose();
+  });
+
   testWidgets('preparation waits for final text and a failure offers retry', (
     tester,
   ) async {
@@ -53,7 +126,7 @@ void main() {
     final enabled = ValueNotifier(false);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [nativeProvider.overrideWithValue(bridge)],
+        overrides: [nativeProvider.overrideWithValue(bridge), _automatic],
         child: MaterialApp(
           home: Scaffold(
             body: ValueListenableBuilder<bool>(
@@ -128,6 +201,7 @@ void main() {
         overrides: [
           nativeProvider.overrideWithValue(bridge),
           expressionsProvider.overrideWith((ref) => Stream.value([])),
+          _automatic,
         ],
         child: MaterialApp(
           locale: const Locale('zh'),
@@ -191,6 +265,7 @@ void main() {
           overrides: [
             databaseProvider.overrideWithValue(db),
             nativeProvider.overrideWithValue(bridge),
+            _automatic,
           ],
           child: const MaterialApp(home: Scaffold(body: SpeakPage())),
         ),
