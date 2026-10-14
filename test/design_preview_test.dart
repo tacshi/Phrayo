@@ -6,11 +6,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phrayo/main.dart';
 import 'package:phrayo/core/models.dart';
+import 'package:phrayo/core/native.g.dart';
 import 'package:phrayo/core/providers.dart';
+import 'package:phrayo/services/platform.dart';
 
 class PreviewSettings extends SettingsController {
   @override
   AppSettings build() => const AppSettings(source: 'en-US');
+}
+
+/// Answers the platform calls the tabs make on open, so previews show real
+/// states and no unanswered call leaves its timeout timer pending.
+class PreviewNative extends PhrayoNative {
+  @override
+  Future<String> ttsStatus(String language) async => 'ready';
+  @override
+  Future<String?> readSecret(String service) async => null;
 }
 
 void main() {
@@ -38,9 +49,12 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      final native = NativeBridge(api: PreviewNative());
+      addTearDown(native.dispose);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            nativeProvider.overrideWithValue(native),
             bootstrapProvider.overrideWith((ref) async {}),
             settingsProvider.overrideWith(PreviewSettings.new),
             recordingsProvider.overrideWith(
