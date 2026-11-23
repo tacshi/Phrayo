@@ -28,7 +28,12 @@ enum _RecordingEnd { finish, discard }
 
 class _SpeakPageState extends ConsumerState<SpeakPage> {
   final input = TextEditingController();
+  final inputFocus = FocusNode();
   String output = '', explanation = '';
+
+  /// Clearing the field ends the recording draft: text typed afterwards is
+  /// saved without the previous recording's audio.
+  bool recordingDetached = false;
   bool googleTranslation = false;
   TranslationStyle style = TranslationStyle.preferred;
   String? sessionId, audioPath, finalAppliedId, editedSessionId;
@@ -49,6 +54,20 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
   void initState() {
     super.initState();
     native = ref.read(nativeProvider);
+    inputFocus.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void startTyping() {
+    inputFocus.requestFocus();
+    // Reopen the keyboard when the field kept focus but it was dismissed.
+    SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+  }
+
+  Future<void> submitTyped() async {
+    inputFocus.unfocus();
+    await translate();
   }
 
   @override
@@ -59,6 +78,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
       unawaited(discardOwnedSession(heldSessionId!));
     }
     resetGesture();
+    inputFocus.dispose();
     input.dispose();
     super.dispose();
   }
@@ -113,6 +133,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     revision++;
     cancellation?.cancel();
     setState(() {
+      if (input.text.trim().isEmpty) recordingDetached = true;
       output = '';
       googleTranslation = false;
       explanation = '';
@@ -122,6 +143,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
 
   Future<void> start() async {
     if (starting || finishing || changingLanguage) return;
+    inputFocus.unfocus();
     setState(() => starting = true);
     revision++;
     cancellation?.cancel();
@@ -156,6 +178,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         finalAppliedId = null;
         editedSessionId = null;
         audioPath = null;
+        recordingDetached = false;
         input.text = '';
         output = '';
         googleTranslation = false;
@@ -253,6 +276,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     googleTranslation = false;
     explanation = '';
     audioPath = null;
+    recordingDetached = false;
     finalAppliedId = null;
     editedSessionId = null;
     busy = false;
@@ -358,8 +382,8 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
       googleTranslation: googleTranslation,
       sourceLanguage: settings.source,
       targetLanguage: settings.target,
-      recordingId: sessionId,
-      audioPath: audioPath,
+      recordingId: recordingDetached ? null : sessionId,
+      audioPath: recordingDetached ? null : audioPath,
     );
   }
 
@@ -412,6 +436,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         setState(() {
           if (fresh) {
             editedSessionId = null;
+            recordingDetached = false;
             revision++;
             cancellation?.cancel();
             input.text = '';
@@ -485,6 +510,8 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
         !(session?.kind == 'recording' &&
             ['recording', 'paused', 'processing'].contains(session?.state));
     final showCancel = (recording || starting) && !finishing;
+    final typing = inputFocus.hasFocus;
+    final idle = !recording && !processing && !starting && !finishing;
     final settings = ref.watch(settingsProvider);
     final colors = Theme.of(context).colorScheme;
     return LayoutBuilder(
@@ -526,13 +553,21 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                   ),
                   const SizedBox(height: 24),
                   TextField(
+                    key: const ValueKey('speak-input'),
                     controller: input,
+                    focusNode: inputFocus,
                     minLines: 2,
                     maxLines: 6,
                     enabled:
                         !recording && !processing && !starting && !finishing,
+                    // Return translates; long phrases still wrap.
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => submitTyped(),
+                    onTapOutside: (_) => inputFocus.unfocus(),
                     decoration: InputDecoration(
                       labelText: tr(context, 'original'),
+                      hintText: tr(context, 'type_hint'),
                       filled: false,
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
                       border: UnderlineInputBorder(
@@ -700,186 +735,225 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                 ],
               ),
             ),
-            Padding(
-              key: const ValueKey('speak-footer'),
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (recording || processing || starting)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Semantics(
-                        liveRegion: true,
-                        child: Text(
-                          '${tr(context, processing
-                              ? 'processing'
-                              : recording
-                              ? 'listening'
-                              : 'preparing_audio')} ${recording ? durationText(session.seconds) : ''}',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                  if (showCancel)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: SizedBox(
-                        key: cancelTarget,
-                        width: 240,
+            if (typing)
+              Padding(
+                key: const ValueKey('speak-footer'),
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+                child: Center(
+                  child: TextButton.icon(
+                    key: const ValueKey('speak-instead'),
+                    onPressed: inputFocus.unfocus,
+                    icon: const Icon(Icons.mic_none_rounded),
+                    label: Text(tr(context, 'speak_instead')),
+                  ),
+                ),
+              )
+            else
+              Padding(
+                key: const ValueKey('speak-footer'),
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (recording || processing || starting)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
                         child: Semantics(
                           liveRegion: true,
-                          label: tr(
-                            context,
-                            cancelArmed ? 'release_to_cancel' : 'cancel',
+                          child: Text(
+                            '${tr(context, processing
+                                ? 'processing'
+                                : recording
+                                ? 'listening'
+                                : 'preparing_audio')} ${recording ? durationText(session.seconds) : ''}',
+                            textAlign: TextAlign.center,
                           ),
-                          button: true,
-                          onTap: pendingEnd != null
-                              ? null
-                              : () => endRecording(_RecordingEnd.discard),
-                          child: ExcludeSemantics(
-                            child: TextButton(
-                              key: const ValueKey('speak-cancel'),
-                              onPressed: pendingEnd != null
-                                  ? null
-                                  : () {
-                                      if (recordingPointer == null) {
-                                        unawaited(
-                                          endRecording(_RecordingEnd.discard),
-                                        );
-                                      }
-                                    },
-                              style: TextButton.styleFrom(
-                                minimumSize: const Size(48, 48),
-                                foregroundColor: cancelArmed
-                                    ? colors.onErrorContainer
-                                    : colors.onSurfaceVariant,
-                                backgroundColor: cancelArmed
-                                    ? colors.errorContainer
-                                    : colors.surfaceContainerHighest,
-                              ),
-                              child: IndexedStack(
-                                index: cancelArmed ? 1 : 0,
-                                alignment: Alignment.center,
-                                children: [
-                                  Text(
-                                    tr(context, 'slide_up_to_cancel'),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  Text(
-                                    tr(context, 'release_to_cancel'),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
+                        ),
+                      ),
+                    if (showCancel)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: SizedBox(
+                          key: cancelTarget,
+                          width: 240,
+                          child: Semantics(
+                            liveRegion: true,
+                            label: tr(
+                              context,
+                              cancelArmed ? 'release_to_cancel' : 'cancel',
+                            ),
+                            button: true,
+                            onTap: pendingEnd != null
+                                ? null
+                                : () => endRecording(_RecordingEnd.discard),
+                            child: ExcludeSemantics(
+                              child: TextButton(
+                                key: const ValueKey('speak-cancel'),
+                                onPressed: pendingEnd != null
+                                    ? null
+                                    : () {
+                                        if (recordingPointer == null) {
+                                          unawaited(
+                                            endRecording(_RecordingEnd.discard),
+                                          );
+                                        }
+                                      },
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                  foregroundColor: cancelArmed
+                                      ? colors.onErrorContainer
+                                      : colors.onSurfaceVariant,
+                                  backgroundColor: cancelArmed
+                                      ? colors.errorContainer
+                                      : colors.surfaceContainerHighest,
+                                ),
+                                child: IndexedStack(
+                                  index: cancelArmed ? 1 : 0,
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Text(
+                                      tr(context, 'slide_up_to_cancel'),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    Text(
+                                      tr(context, 'release_to_cancel'),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  Center(
-                    child: Semantics(
-                      key: const ValueKey("speak-control"),
-                      enabled: controlEnabled && !starting,
-                      button: true,
-                      label: tr(context, recording ? 'stop' : 'start'),
-                      onTap:
-                          !controlEnabled ||
-                              starting ||
-                              recordingPointer != null
-                          ? null
-                          : () {
-                              if (recording) {
-                                endRecording(_RecordingEnd.finish);
-                              } else {
-                                resetGesture();
-                                start();
-                              }
-                            },
-                      child: ExcludeSemantics(
-                        child: Listener(
-                          behavior: HitTestBehavior.opaque,
-                          onPointerDown: !controlEnabled
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Visibility(
+                          visible: idle,
+                          maintainSize: true,
+                          maintainState: true,
+                          maintainAnimation: true,
+                          child: IconButton(
+                            key: const ValueKey('type-instead'),
+                            tooltip: tr(context, 'type_instead'),
+                            onPressed: idle && controlEnabled
+                                ? startTyping
+                                : null,
+                            icon: const Icon(Icons.keyboard_alt_outlined),
+                          ),
+                        ),
+                        SizedBox(width: compact ? 16 : 24),
+                        Semantics(
+                          key: const ValueKey("speak-control"),
+                          enabled: controlEnabled && !starting,
+                          button: true,
+                          label: tr(context, recording ? 'stop' : 'start'),
+                          onTap:
+                              !controlEnabled ||
+                                  starting ||
+                                  recordingPointer != null
                               ? null
-                              : (event) {
-                                  if (starting ||
-                                      finishing ||
-                                      recordingPointer != null ||
-                                      pendingEnd != null) {
-                                    return;
-                                  }
-                                  setState(() {
-                                    recordingPointer = event.pointer;
-                                    cancelArmed = false;
-                                  });
+                              : () {
                                   if (recording) {
-                                    heldSessionId = session.id;
+                                    endRecording(_RecordingEnd.finish);
                                   } else {
+                                    resetGesture();
                                     start();
                                   }
                                 },
-                          onPointerMove: moveRecordingPointer,
-                          onPointerUp: releaseRecordingPointer,
-                          onPointerCancel: (event) =>
-                              releaseRecordingPointer(event, cancelled: true),
-                          child: AnimatedContainer(
-                            key: microphoneTarget,
-                            duration: MediaQuery.disableAnimationsOf(context)
-                                ? Duration.zero
-                                : const Duration(milliseconds: 120),
-                            width: controlSize,
-                            height: controlSize,
-                            decoration: BoxDecoration(
-                              color: recording
-                                  ? colors.primaryContainer
-                                  : colors.primary,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                if (recording)
-                                  BoxShadow(
-                                    color: colors.primary.withValues(
-                                      alpha: 0.25,
-                                    ),
-                                    spreadRadius: 6 + (session.level * 8),
-                                    blurRadius: 0,
+                          child: ExcludeSemantics(
+                            child: Listener(
+                              behavior: HitTestBehavior.opaque,
+                              onPointerDown: !controlEnabled
+                                  ? null
+                                  : (event) {
+                                      if (starting ||
+                                          finishing ||
+                                          recordingPointer != null ||
+                                          pendingEnd != null) {
+                                        return;
+                                      }
+                                      setState(() {
+                                        recordingPointer = event.pointer;
+                                        cancelArmed = false;
+                                      });
+                                      if (recording) {
+                                        heldSessionId = session.id;
+                                      } else {
+                                        start();
+                                      }
+                                    },
+                              onPointerMove: moveRecordingPointer,
+                              onPointerUp: releaseRecordingPointer,
+                              onPointerCancel: (event) =>
+                                  releaseRecordingPointer(
+                                    event,
+                                    cancelled: true,
                                   ),
-                              ],
+                              child: AnimatedContainer(
+                                key: microphoneTarget,
+                                duration:
+                                    MediaQuery.disableAnimationsOf(context)
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 120),
+                                width: controlSize,
+                                height: controlSize,
+                                decoration: BoxDecoration(
+                                  color: recording
+                                      ? colors.primaryContainer
+                                      : colors.primary,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    if (recording)
+                                      BoxShadow(
+                                        color: colors.primary.withValues(
+                                          alpha: 0.25,
+                                        ),
+                                        spreadRadius: 6 + (session.level * 8),
+                                        blurRadius: 0,
+                                      ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  recording
+                                      ? Icons.stop_rounded
+                                      : Icons.mic_rounded,
+                                  size: 36,
+                                  color: recording
+                                      ? colors.onPrimaryContainer
+                                      : colors.onPrimary,
+                                ),
+                              ),
                             ),
-                            child: Icon(
-                              recording
-                                  ? Icons.stop_rounded
-                                  : Icons.mic_rounded,
-                              size: 36,
-                              color: recording
-                                  ? colors.onPrimaryContainer
-                                  : colors.onPrimary,
-                            ),
+                          ),
+                        ),
+                        SizedBox(width: compact ? 16 : 24),
+                        // Mirrors the keyboard button so the microphone stays
+                        // centred.
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                    Visibility(
+                      visible: idle,
+                      maintainSize: true,
+                      maintainState: true,
+                      maintainAnimation: true,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: ExcludeSemantics(
+                          child: Text(
+                            tr(context, 'hold_to_speak'),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.onSurfaceVariant),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  Visibility(
-                    visible:
-                        !recording && !processing && !starting && !finishing,
-                    maintainSize: true,
-                    maintainState: true,
-                    maintainAnimation: true,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: ExcludeSemantics(
-                        child: Text(
-                          tr(context, 'hold_to_speak'),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colors.onSurfaceVariant),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         );
       },

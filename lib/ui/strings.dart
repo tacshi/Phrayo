@@ -179,6 +179,9 @@ const words = <String, List<String>>{
   'settings': ['Settings', '设置', '設定'],
   'start': ['Start speaking', '开始说话', '開始說話'],
   'hold_to_speak': ['Hold to speak', '按住说话', '按住說話'],
+  'type_instead': ['Type instead', '改用键盘输入', '改用鍵盤輸入'],
+  'speak_instead': ['Speak instead', '改用语音输入', '改用語音輸入'],
+  'type_hint': ['Type a word or sentence', '输入一个词或一句话', '輸入一個詞或一句話'],
   'slide_up_to_cancel': ['Slide up to cancel', '上滑取消', '上滑取消'],
   'release_to_cancel': ['Release to cancel', '松开取消', '鬆開取消'],
   'cancel_recording_failed': [
