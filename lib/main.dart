@@ -341,84 +341,91 @@ class AppShell extends ConsumerWidget {
       isLabelVisible: capturing && index != 2,
       child: const Icon(Icons.graphic_eq_rounded),
     );
+    // Recordings and Settings bring their own app bar; Speak and Expressions
+    // use the shell's.
+    final appBar = index >= 2
+        ? null
+        : AppBar(
+            title: index == 1
+                ? Text(
+                    tr(context, 'library'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SproutLogo(size: 38),
+                      const SizedBox(width: 8),
+                      Text(
+                        Localizations.localeOf(context).languageCode == 'zh'
+                            ? '句芽'
+                            : 'Phrayo',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+          );
+    final page = Column(
+      children: [
+        if (boot.hasError || recoveryError != null)
+          MaterialBanner(
+            content: Text(tr(context, errorKey(recoveryError ?? boot.error!))),
+            actions: [
+              TextButton(
+                onPressed: () => ref.invalidate(bootstrapProvider),
+                child: Text(tr(context, 'retry')),
+              ),
+            ],
+          ),
+        Expanded(child: child),
+      ],
+    );
     return Scaffold(
-      appBar: index >= 2
-          ? null
-          : AppBar(
-              title: index != 0
-                  ? Text(
-                      tr(context, index == 1 ? 'library' : 'recordings'),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SproutLogo(size: 38),
-                        const SizedBox(width: 8),
-                        Text(
-                          Localizations.localeOf(context).languageCode == 'zh'
-                              ? '句芽'
-                              : 'Phrayo',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+      appBar: wide ? null : appBar,
+      body: SafeArea(
+        child: wide
+            // The rail runs the full height beside the page, so it stays put
+            // whether or not the page has the shell's app bar above it.
+            ? Row(
+                children: [
+                  // Tab labels keep their size, as system tab bars do, so
+                  // large text never breaks them mid-word.
+                  MediaQuery.withClampedTextScaling(
+                    maxScaleFactor: 1,
+                    child: NavigationRail(
+                      selectedIndex: index,
+                      onDestinationSelected: navigate,
+                      labelType: NavigationRailLabelType.all,
+                      destinations: [
+                        NavigationRailDestination(
+                          icon: const Icon(Icons.mic_none_rounded),
+                          label: Text(tr(context, 'speak')),
+                        ),
+                        NavigationRailDestination(
+                          icon: libraryIcon(Icons.bookmark_border_rounded),
+                          selectedIcon: libraryIcon(Icons.bookmark_rounded),
+                          label: Text(tr(context, 'library')),
+                        ),
+                        NavigationRailDestination(
+                          icon: recordingsIcon(),
+                          label: Text(tr(context, 'recordings')),
+                        ),
+                        NavigationRailDestination(
+                          icon: const Icon(Icons.settings_outlined),
+                          selectedIcon: const Icon(Icons.settings_rounded),
+                          label: Text(tr(context, 'settings')),
                         ),
                       ],
                     ),
-            ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (boot.hasError || recoveryError != null)
-              MaterialBanner(
-                content: Text(
-                  tr(context, errorKey(recoveryError ?? boot.error!)),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => ref.invalidate(bootstrapProvider),
-                    child: Text(tr(context, 'retry')),
+                  ),
+                  Expanded(
+                    child: appBar == null
+                        ? page
+                        : Scaffold(appBar: appBar, body: page),
                   ),
                 ],
-              ),
-            Expanded(
-              child: Row(
-                children: [
-                  if (wide)
-                    // Tab labels keep their size, as system tab bars do, so
-                    // large text never breaks them mid-word.
-                    MediaQuery.withClampedTextScaling(
-                      maxScaleFactor: 1,
-                      child: NavigationRail(
-                        selectedIndex: index,
-                        onDestinationSelected: navigate,
-                        labelType: NavigationRailLabelType.all,
-                        destinations: [
-                          NavigationRailDestination(
-                            icon: const Icon(Icons.mic_none_rounded),
-                            label: Text(tr(context, 'speak')),
-                          ),
-                          NavigationRailDestination(
-                            icon: libraryIcon(Icons.bookmark_border_rounded),
-                            selectedIcon: libraryIcon(Icons.bookmark_rounded),
-                            label: Text(tr(context, 'library')),
-                          ),
-                          NavigationRailDestination(
-                            icon: recordingsIcon(),
-                            label: Text(tr(context, 'recordings')),
-                          ),
-                          NavigationRailDestination(
-                            icon: const Icon(Icons.settings_outlined),
-                            selectedIcon: const Icon(Icons.settings_rounded),
-                            label: Text(tr(context, 'settings')),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Expanded(child: child),
-                ],
-              ),
-            ),
-          ],
-        ),
+              )
+            : page,
       ),
       bottomNavigationBar: wide
           ? null
