@@ -52,59 +52,89 @@ class DelayedProcessor extends TextProcessor {
 }
 
 void main() {
-  test('navigation surfaces match the page in both themes', () {
-    for (final brightness in Brightness.values) {
+  test('both themes use SwiftUI\'s system colours', () {
+    for (final (brightness, accent, page, card) in [
+      (
+        Brightness.light,
+        const Color(0xFF007AFF),
+        const Color(0xFFF2F2F7),
+        const Color(0xFFFFFFFF),
+      ),
+      (
+        Brightness.dark,
+        const Color(0xFF0A84FF),
+        const Color(0xFF000000),
+        const Color(0xFF1C1C1E),
+      ),
+    ]) {
       final theme = appTheme(brightness);
-      expect(theme.appBarTheme.backgroundColor, theme.scaffoldBackgroundColor);
+      expect(theme.colorScheme.brightness, brightness);
+      expect(theme.colorScheme.primary, accent);
+      expect(theme.scaffoldBackgroundColor, page);
+      expect(theme.colorScheme.surface, page);
+      expect(theme.cardTheme.color, card);
       expect(
-        theme.navigationBarTheme.backgroundColor,
-        theme.scaffoldBackgroundColor,
+        theme.colorScheme.error,
+        brightness == Brightness.light
+            ? const Color(0xFFFF3B30)
+            : const Color(0xFFFF453A),
       );
+      // Not Flutter's default Material scheme.
       expect(
-        theme.navigationRailTheme.backgroundColor,
-        theme.scaffoldBackgroundColor,
+        theme.colorScheme.primary,
+        isNot(ThemeData(brightness: brightness).colorScheme.primary),
       );
-      expect(theme.appBarTheme.surfaceTintColor, Colors.transparent);
     }
   });
 
-  testWidgets(
-    'translation controls share a row and system translation needs no model',
-    (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [bootstrapProvider.overrideWith((ref) async {})],
-          child: const PhrayoApp(),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Hello');
-      await tester.pumpAndSettle();
-      // The label names Google on Android, so find the button by its key.
-      final button = find.byKey(const ValueKey('translate-speech'));
-      final picker = find.byType(TranslationStylePicker);
-      expect(tester.widget<TextButton>(button).onPressed, isNotNull);
-      expect(
-        tester
-            .widget<DropdownButtonFormField<TranslationStyle>>(
-              find.byType(DropdownButtonFormField<TranslationStyle>),
-            )
-            .onChanged,
-        isNull,
-      );
-      expect(
-        tester.getCenter(button).dy,
-        closeTo(tester.getCenter(picker).dy, 1),
-      );
-      expect(find.text(words['style_requires_model']!.first), findsNothing);
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pumpAndSettle();
-    },
-  );
+  for (final model in [false, true]) {
+    testWidgets(
+      model
+          ? 'with a text model, style and Translate share a row'
+          : 'system translation needs no model and hides unavailable styles',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              bootstrapProvider.overrideWith((ref) async {}),
+              if (model) settingsProvider.overrideWith(OnlineSettings.new),
+            ],
+            child: const PhrayoApp(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Hello');
+        await tester.pumpAndSettle();
+        // The label names Google on Android, so find the button by its key.
+        final button = find.byKey(const ValueKey('translate-speech'));
+        final picker = find.byType(TranslationStylePicker);
+        expect(tester.widget<ButtonStyleButton>(button).onPressed, isNotNull);
+        if (model) {
+          expect(
+            tester
+                .widget<DropdownButtonFormField<TranslationStyle>>(
+                  find.byType(DropdownButtonFormField<TranslationStyle>),
+                )
+                .onChanged,
+            isNotNull,
+          );
+          expect(
+            tester.getCenter(button).dy,
+            closeTo(tester.getCenter(picker).dy, 1),
+          );
+        } else {
+          expect(picker, findsNothing);
+        }
+        expect(find.text(words['style_requires_model']!.first), findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
 
   test('all user-visible strings have three translations', () {
     for (final entry in words.entries) {

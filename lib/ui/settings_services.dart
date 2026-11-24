@@ -10,6 +10,29 @@ import 'common.dart';
 import 'settings_widgets.dart';
 import 'strings.dart';
 
+/// Whether text model actions can run. When they cannot, says why and, if a
+/// model is simply not set up yet, offers the page that sets one up.
+bool requireTextModel(BuildContext context, WidgetRef ref) {
+  final settings = ref.read(settingsProvider);
+  if (settings.usesTextModel) return true;
+  if (settings.localOnly) {
+    notice(context, 'online_required');
+    return false;
+  }
+  final navigator = Navigator.of(context, rootNavigator: true);
+  notice(
+    context,
+    'text_model_needed',
+    action: SnackBarAction(
+      label: tr(context, 'set_up'),
+      onPressed: () => navigator.push(
+        MaterialPageRoute<void>(builder: (_) => const TextModelSettingsPage()),
+      ),
+    ),
+  );
+  return false;
+}
+
 /// API key field that sits inside a settings card.
 class _KeyField extends StatelessWidget {
   final Key fieldKey;

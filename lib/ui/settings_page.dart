@@ -374,7 +374,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           title: tr(context, 'auto_speech'),
           subtitle: tr(context, 'auto_speech_help'),
           enabled: !busy,
-          trailing: Switch(
+          trailing: Switch.adaptive(
             value: s.autoGenerateVoice,
             onChanged: busy
                 ? null
@@ -496,7 +496,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   android ? 'android_local_services' : 'local_services',
                 ),
                 enabled: !busy,
-                trailing: Switch(
+                trailing: Switch.adaptive(
                   value: s.localOnly,
                   onChanged: busy
                       ? null

@@ -83,6 +83,7 @@ void main() {
           overrides: [
             databaseProvider.overrideWithValue(db),
             nativeProvider.overrideWithValue(native),
+            settingsProvider.overrideWith(_ModelSettings.new),
           ],
           child: MaterialApp(
             locale: locale,
@@ -121,6 +122,35 @@ void main() {
       await tester.runAsync(db.close);
     });
   }
+
+  testWidgets('without a text model, the recording offers no style picker', (
+    tester,
+  ) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    final native = NativeBridge(api: EditNative());
+    await tester.runAsync(() => db.insertRecording(sample()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          nativeProvider.overrideWithValue(native),
+        ],
+        child: const MaterialApp(home: RecordingDetail(id: 'sample')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Tab).at(1));
+    await tester.pumpAndSettle();
+    expect(find.byType(TranslationStylePicker), findsNothing);
+    final button = find.byKey(const ValueKey('translate-recording'));
+    expect(tester.widget<ButtonStyleButton>(button).onPressed, isNotNull);
+    expect(tester.getRect(button).left, greaterThanOrEqualTo(24));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await native.dispose();
+    await tester.runAsync(db.close);
+  });
 
   testWidgets(
     'save translation retains source/audio, prevents duplicates and follows deletion and retranslation',

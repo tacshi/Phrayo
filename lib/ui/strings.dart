@@ -144,6 +144,11 @@ const words = <String, List<String>>{
     '{count} 條刪除失敗，已保留選擇，請重試。',
   ],
   'no_recordings': ['No recordings yet', '还没有录音', '還沒有錄音'],
+  'empty_recordings': [
+    'Record a conversation or a talk. Once it’s transcribed, you can replay passages and turn them into expressions.',
+    '录下一段对话或讲座。转写后可以回听片段，并把它们变成练习表达。',
+    '錄下一段對話或講座。轉寫後可以回聽片段，並把它們變成練習表達。',
+  ],
   'prompt': ['Meaning', '原意', '原意'],
   'reference_expression': ['Reference expression', '参考表达', '參考表達'],
   'answer_by_speaking': ['Say it yourself', '自己说', '自己說'],
@@ -206,9 +211,9 @@ const words = <String, List<String>>{
   'explain': ['Explain this expression', '解释表达', '解釋表達'],
   'search': ['Search expressions', '搜索表达', '搜尋表達'],
   'empty_library': [
-    'Save something you want to say again.',
-    '收藏你还想再说的表达。',
-    '收藏你還想再說的表達。',
+    'Save an expression from Speak or a recording, and it will be here when you want to review it.',
+    '在「说话」或录音里收藏表达，之后就能在这里复习。',
+    '在「說話」或錄音裡收藏表達，之後就能在這裡複習。',
   ],
   'review': ['Review due expressions', '复习到期表达', '複習到期表達'],
   'delete': ['Delete', '删除', '刪除'],
@@ -229,11 +234,6 @@ const words = <String, List<String>>{
   'resume': ['Resume', '继续', '繼續'],
   'paused': ['Paused', '已暂停', '已暫停'],
   'recording': ['Recording', '录音中', '錄音中'],
-  'empty_recordings': [
-    'Record a conversation to revisit it.',
-    '录下对话，留待回听与练习。',
-    '錄下對話，留待回聽與練習。',
-  ],
   'untitled': ['Recording', '录音', '錄音'],
   'transcribe': ['Transcribe', '转写', '轉寫'],
   'transcript': ['Transcript', '转写', '轉寫'],
@@ -498,7 +498,113 @@ const words = <String, List<String>>{
     '服務忙碌，請稍後重試。',
   ],
   'open_settings': ['Open Settings', '打开设置', '開啟設定'],
+  'swap_languages': ['Swap languages', '交换语言', '交換語言'],
+  'clear_input': ['Clear text', '清除文字', '清除文字'],
+  'copy': ['Copy', '复制', '複製'],
+  'copied_toast': ['Copied', '已复制', '已複製'],
+  'explanation_title': ['Explanation', '解释', '解釋'],
+  'translating_status': ['Translating…', '正在翻译…', '正在翻譯…'],
+  'speak_intro_title': ['Say it your way', '想说什么，就说出来', '想說什麼，就說出來'],
+  'speak_intro_body': [
+    'Hold the microphone and speak in {source}. You’ll get natural {target} to listen to, save and practise.',
+    '按住麦克风，用{source}说出来。你会得到地道的{target}表达，可以收听、收藏和练习。',
+    '按住麥克風，用{source}說出來。你會得到道地的{target}表達，可以收聽、收藏和練習。',
+  ],
+  'expression_deleted': ['Expression deleted', '表达已删除', '表達已刪除'],
+  'undo': ['Undo', '撤销', '復原'],
+  'review_ready': [
+    '{count} expressions ready to review',
+    '{count} 条表达待复习',
+    '{count} 條表達待複習',
+  ],
+  'review_ready_one': ['1 expression ready to review', '1 条表达待复习', '1 條表達待複習'],
+  'review_ready_hint': [
+    'A short review now helps them stick.',
+    '现在花几分钟复习，记得更牢。',
+    '現在花幾分鐘複習，記得更牢。',
+  ],
+  'caught_up': [
+    'All caught up. Next review {when}.',
+    '已全部复习，下次复习：{when}。',
+    '已全部複習，下次複習：{when}。',
+  ],
+  'later_today': ['later today', '今天稍后', '今天稍後'],
+  'due_tomorrow': ['tomorrow', '明天', '明天'],
+  'in_days': ['in {count} days', '{count} 天后', '{count} 天後'],
+  'empty_library_title': ['No saved expressions yet', '还没有收藏的表达', '還沒有收藏的表達'],
+  'day_today': ['Today', '今天', '今天'],
+  'day_yesterday': ['Yesterday', '昨天', '昨天'],
+  'say_it_in': ['Say it in {language}', '用{language}说出来', '用{language}說出來'],
+  'review_progress': [
+    '{index} of {total}',
+    '{index} / {total}',
+    '{index} / {total}',
+  ],
+  'review_again_tomorrow': ['Review tomorrow', '明天复习', '明天複習'],
+  'review_next_in_days': [
+    'Review in {count} days',
+    '{count} 天后复习',
+    '{count} 天後複習',
+  ],
+  'review_next_in_days_one': ['Review tomorrow', '明天复习', '明天複習'],
+  'feedback_title': ['Feedback', '反馈', '回饋'],
+  'text_model_needed': [
+    'This needs a text model. Set one up in Settings.',
+    '此功能需要文字模型，请先在设置中配置。',
+    '此功能需要文字模型，請先在設定中設定。',
+  ],
+  'set_up': ['Set up', '去设置', '去設定'],
+  'summary_empty': [
+    'Pull out the main points, each linked back to the audio.',
+    '提炼这段录音的要点，每条都能回听原音。',
+    '提煉這段錄音的重點，每條都能回聽原音。',
+  ],
+  'play_passage': ['Play passage', '播放片段', '播放片段'],
+  'due_tag': ['Due for review', '待复习', '待複習'],
+  'has_source_audio': ['Original audio', '有原音', '有原音'],
+  'speak_or_type_hint': [
+    'Hold the mic to speak, or tap here to type',
+    '按住麦克风说话，或点这里输入',
+    '按住麥克風說話，或點這裡輸入',
+  ],
 };
+
+/// [key] with each `{name}` placeholder replaced. In Chinese, a value that
+/// begins or ends with a Latin letter or digit is set off by a space, as
+/// Chinese typography does for embedded Latin text.
+String trFill(BuildContext context, String key, Map<String, String> values) {
+  var text = tr(context, key);
+  final chinese = Localizations.localeOf(context).languageCode == 'zh';
+  final latin = RegExp(r'[A-Za-z0-9)]');
+  values.forEach((name, value) {
+    final placeholder = '{$name}';
+    final at = text.indexOf(placeholder);
+    if (at < 0) return;
+    var filled = value;
+    if (chinese && value.isNotEmpty) {
+      final before = at > 0 ? text[at - 1] : ' ';
+      final after = at + placeholder.length < text.length
+          ? text[at + placeholder.length]
+          : ' ';
+      if (latin.hasMatch(value[0]) && before.codeUnitAt(0) > 0x2e7f) {
+        filled = ' $filled';
+      }
+      if (latin.hasMatch(value[value.length - 1]) &&
+          after.codeUnitAt(0) > 0x2e7f) {
+        filled = '$filled ';
+      }
+    }
+    text = text.replaceAll(placeholder, filled);
+  });
+  return text;
+}
+
+/// [key] filled with [count], using the `_one` variant for a single item
+/// when there is one.
+String trCount(BuildContext context, String key, int count) => tr(
+  context,
+  count == 1 && words.containsKey('${key}_one') ? '${key}_one' : key,
+).replaceAll('{count}', '$count');
 String tr(BuildContext context, String key) {
   final locale = Localizations.localeOf(context);
   final index = locale.languageCode == 'zh'

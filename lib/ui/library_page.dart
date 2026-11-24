@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
 
+import '../core/languages.dart';
 import '../core/models.dart';
 import '../core/providers.dart';
+import 'settings_services.dart';
 import 'strings.dart';
 import 'translation_attribution.dart';
 import 'common.dart';
@@ -23,70 +29,183 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     super.dispose();
   }
 
+  void practise(Expression expression, [List<Expression> queue = const []]) =>
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PracticePage(expression: expression, queue: queue),
+        ),
+      );
+
+  /// Deletes at once and offers Undo, which restores the expression together
+  /// with its practice history.
+  Future<void> delete(Expression p) async {
+    final db = ref.read(databaseProvider);
+    final history = (await db.list('practice'))
+        .where((row) => row['expressionId'] == p.id)
+        .toList();
+    await db.removeExpression(p.id);
+    if (!mounted) return;
+    notice(
+      context,
+      'expression_deleted',
+      action: SnackBarAction(
+        label: tr(context, 'undo'),
+        onPressed: () async {
+          try {
+            await db.transaction(() async {
+              await db.put(
+                p.id,
+                'expression',
+                p.toJson(),
+                revision: p.revision,
+              );
+              for (final row in history) {
+                await db.put(row['id'] as String, 'practice', row);
+              }
+            });
+          } catch (e) {
+            if (mounted) notice(context, errorKey(e));
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final collection = ref.watch(expressionsProvider);
     final all = collection.asData?.value ?? [];
     final filtered = all
         .where(
           (p) => '${p.source} ${p.target}'.toLowerCase().contains(
-            query.toLowerCase(),
+            query.trim().toLowerCase(),
           ),
         )
         .toList();
-    final due = all.where((e) => !e.due.isAfter(DateTime.now())).toList();
+    final now = DateTime.now();
+    final due = all.where((e) => !e.due.isAfter(now)).toList()
+      ..sort((a, b) => a.due.compareTo(b.due));
+    final nextDue = all.isEmpty
+        ? null
+        : all.map((e) => e.due).reduce((a, b) => a.isBefore(b) ? a : b);
+    final searching = query.trim().isNotEmpty;
     return PageBody(
       children: [
-        TextField(
-          key: const ValueKey('library-search'),
-          controller: search,
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
+        if (all.isNotEmpty || searching || collection.isLoading)
+          TextField(
+            key: const ValueKey('library-search'),
+            controller: search,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: tr(context, 'clear_search'),
+                      onPressed: () {
+                        search.clear();
+                        setState(() => query = '');
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              hintText: tr(context, 'search'),
+              prefixIcon: const Icon(Icons.search_rounded),
             ),
-            suffixIcon: query.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: tr(context, 'clear_search'),
-                    onPressed: () {
-                      search.clear();
-                      setState(() => query = '');
-                    },
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-            hintText: tr(context, 'search'),
-            prefixIcon: const Icon(Icons.search_rounded),
+            onChanged: (s) => setState(() => query = s),
           ),
-          onChanged: (s) => setState(() => query = s),
-        ),
-        if (due.isNotEmpty && query.isEmpty)
+        if (due.isNotEmpty && !searching)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Panel(
+              key: const ValueKey('review-banner'),
+              color: Color.alphaBlend(
+                colors.primary.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.14 : 0.09,
+                ),
+                surfaceCard(context),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      if (!largeText(context)) ...[
+                        ExcludeSemantics(
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: colors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.event_repeat_rounded,
+                              color: colors.onPrimary,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                      ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              trCount(context, 'review_ready', due.length),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              tr(context, 'review_ready_hint'),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    key: const ValueKey('start-review'),
+                    onPressed: () => practise(due.first, due.skip(1).toList()),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text(tr(context, 'start_review')),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (nextDue != null && !searching)
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 4),
             child: Row(
               children: [
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 18,
+                  color: colors.primary,
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     tr(
                       context,
-                      'review_due_count',
-                    ).replaceAll('{count}', '${due.length}'),
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ),
-                Flexible(
-                  child: TextButton(
-                    onPressed: () =>
-                        Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => PracticePage(
-                              expression: due.first,
-                              queue: due.skip(1).toList(),
-                            ),
-                          ),
-                        ),
-                    child: Text(tr(context, 'start_review')),
+                      'caught_up',
+                    ).replaceAll('{when}', reviewWhen(context, nextDue)),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
@@ -98,113 +217,200 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             child: Center(child: CircularProgressIndicator()),
           ),
         if (collection.hasError)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            child: Column(
-              children: [
-                Text(tr(context, errorKey(collection.error!))),
-                TextButton(
-                  onPressed: () => ref.invalidate(expressionsProvider),
-                  child: Text(tr(context, 'retry')),
-                ),
-              ],
+          EmptyState(
+            icon: Icons.error_outline_rounded,
+            title: tr(context, errorKey(collection.error!)),
+            action: TextButton(
+              onPressed: () => ref.invalidate(expressionsProvider),
+              child: Text(tr(context, 'retry')),
             ),
           ),
         if (!collection.isLoading && !collection.hasError && filtered.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 48),
-            child: Text(
-              tr(context, all.isEmpty ? 'empty_library' : 'no_search_results'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          all.isEmpty
+              ? EmptyState(
+                  icon: Icons.bookmark_add_outlined,
+                  title: tr(context, 'empty_library_title'),
+                  message: tr(context, 'empty_library'),
+                  action: FilledButton.tonalIcon(
+                    onPressed: () => GoRouter.of(context).go('/'),
+                    icon: const Icon(Icons.mic_rounded),
+                    label: Text(tr(context, 'start')),
+                  ),
+                )
+              : EmptyState(
+                  compact: true,
+                  icon: Icons.search_off_rounded,
+                  title: tr(context, 'no_search_results'),
+                ),
+        if (filtered.isNotEmpty) const SizedBox(height: 8),
+        for (final (index, p) in filtered.indexed) ...[
+          if (index > 0) const Divider(height: 1),
+          _ExpressionRow(
+            expression: p,
+            due: !p.due.isAfter(now),
+            onTap: () => practise(p),
+            onSelected: (key) => action(context, () async {
+              if (key == 'delete') {
+                await delete(p);
+              } else if (key == 'share') {
+                await ref
+                    .read(nativeProvider)
+                    .api
+                    .share('${p.source}\n${p.target}', null);
+              } else {
+                await editExpression(context, ref, p);
+              }
+            }),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ExpressionRow extends StatelessWidget {
+  final Expression expression;
+  final bool due;
+  final VoidCallback onTap;
+  final ValueChanged<String> onSelected;
+  const _ExpressionRow({
+    required this.expression,
+    required this.due,
+    required this.onTap,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final p = expression;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    p.target,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      height: 1.45,
+                    ),
+                  ),
+                  if (p.googleTranslation) const TranslationAttribution(),
+                  const SizedBox(height: 6),
+                  Text(
+                    p.source,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      height: 1.5,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  if (due || p.audioPath != null) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
+                      children: [
+                        if (due)
+                          _Tag(
+                            icon: Icons.event_repeat_rounded,
+                            label: tr(context, 'due_tag'),
+                            color: colors.primary,
+                          ),
+                        if (p.audioPath != null)
+                          _Tag(
+                            icon: Icons.graphic_eq_rounded,
+                            label: tr(context, 'has_source_audio'),
+                            color: colors.onSurfaceVariant,
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
-          ),
-        ...filtered.map(
-          (p) => Column(
-            children: [
-              InkWell(
-                onTap: () => Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => PracticePage(expression: p),
+            const SizedBox(width: 4),
+            PopupMenuButton<String>(
+              tooltip: tr(context, 'more'),
+              icon: Icon(
+                Icons.more_horiz_rounded,
+                color: colors.onSurfaceVariant,
+              ),
+              onSelected: onSelected,
+              itemBuilder: (_) => [
+                for (final (key, icon) in [
+                  ('edit', Icons.edit_outlined),
+                  ('share', Icons.ios_share_rounded),
+                ])
+                  PopupMenuItem(
+                    value: key,
+                    child: Row(
+                      children: [
+                        Icon(icon, size: 20),
+                        const SizedBox(width: 12),
+                        Text(tr(context, key)),
+                      ],
+                    ),
                   ),
-                ),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'delete',
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              p.target,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.5,
-                                  ),
-                            ),
-                            if (p.googleTranslation)
-                              const TranslationAttribution(),
-                            const SizedBox(height: 8),
-                            Text(
-                              p.source,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    height: 1.5,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
+                      Icon(
+                        Icons.delete_outline_rounded,
+                        size: 20,
+                        color: colors.error,
                       ),
-                      const SizedBox(width: 8),
-                      PopupMenuButton<String>(
-                        tooltip: tr(context, 'more'),
-                        onSelected: (key) => action(context, () async {
-                          if (key == 'delete') {
-                            await ref
-                                .read(databaseProvider)
-                                .removeExpression(p.id);
-                          } else if (key == 'share') {
-                            await ref
-                                .read(nativeProvider)
-                                .api
-                                .share('${p.source}\n${p.target}', null);
-                          } else {
-                            await editExpression(context, ref, p);
-                          }
-                        }),
-                        itemBuilder: (_) => ['edit', 'share', 'delete']
-                            .map(
-                              (key) => PopupMenuItem(
-                                value: key,
-                                child: Text(tr(context, key)),
-                              ),
-                            )
-                            .toList(),
+                      const SizedBox(width: 12),
+                      Text(
+                        tr(context, 'delete'),
+                        style: TextStyle(color: colors.error),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const Divider(height: 1),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+}
+
+class _Tag extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _Tag({required this.icon, required this.label, required this.color});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 14, color: color),
+      const SizedBox(width: 4),
+      Flexible(
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium
+              ?.copyWith(color: color),
+        ),
+      ),
+    ],
+  );
 }
 
 Future<void> editExpression(
@@ -284,10 +490,14 @@ class PracticePage extends ConsumerStatefulWidget {
 class _PracticePageState extends ConsumerState<PracticePage> {
   late Expression expression;
   late List<Expression> queue;
+  late final int total = widget.queue.length + 1;
   bool revealed = false, busy = false, recording = false;
   String answer = '', feedback = '';
   String? attemptPath, attemptId;
   CancelToken? cancel;
+
+  /// 1-based position of the current expression in a review session.
+  int get position => total - queue.length;
   @override
   void initState() {
     super.initState();
@@ -307,6 +517,7 @@ class _PracticePageState extends ConsumerState<PracticePage> {
     await action(context, () async {
       final native = ref.read(nativeProvider);
       if (recording) {
+        unawaited(HapticFeedback.selectionClick());
         final result = await native.api.stop();
         if (mounted) {
           setState(() {
@@ -327,6 +538,7 @@ class _PracticePageState extends ConsumerState<PracticePage> {
           settings.transcriptionTerms,
         );
         attemptId = s.id;
+        unawaited(HapticFeedback.mediumImpact());
         if (mounted) {
           setState(() {
             recording = true;
@@ -340,6 +552,7 @@ class _PracticePageState extends ConsumerState<PracticePage> {
   }
 
   Future<void> evaluate() async {
+    if (!requireTextModel(context, ref)) return;
     setState(() => busy = true);
     cancel = CancelToken();
     await action(context, () async {
@@ -361,6 +574,9 @@ class _PracticePageState extends ConsumerState<PracticePage> {
   Future<void> review(bool known) async {
     if (busy || recording) return;
     setState(() => busy = true);
+    unawaited(
+      known ? HapticFeedback.lightImpact() : HapticFeedback.selectionClick(),
+    );
     await action(context, () async {
       final db = ref.read(databaseProvider);
       final original = await db.get(expression.id);
@@ -400,6 +616,20 @@ class _PracticePageState extends ConsumerState<PracticePage> {
     if (mounted) setState(() => busy = false);
   }
 
+  /// The wait before the next review that each answer would schedule, using
+  /// the same intervals as [Expression.reviewed].
+  String nextReview(bool known) {
+    if (!known) return tr(context, 'review_again_tomorrow');
+    const days = [1, 3, 7, 14, 30];
+    return trCount(
+      context,
+      'review_next_in_days',
+      days[expression.interval.clamp(0, days.length - 1)],
+    );
+  }
+
+  void play(Future<void> Function() run) => action(context, run);
+
   @override
   Widget build(BuildContext context) {
     ref.listen(sessionProvider, (_, next) {
@@ -416,144 +646,273 @@ class _PracticePageState extends ConsumerState<PracticePage> {
         }
       });
     });
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final native = ref.read(nativeProvider);
+    final reviewing = total > 1;
+    // A new expression comes back tomorrow either way; the hints only help
+    // once the answers lead to different waits.
+    final hints = revealed && nextReview(true) != nextReview(false);
+    final language =
+        languages[expression.targetLanguage] ?? expression.targetLanguage;
     return PopScope(
       canPop: !recording,
       child: Scaffold(
-        appBar: AppBar(title: Text(tr(context, 'practice'))),
+        appBar: AppBar(
+          title: Text(tr(context, 'practice')),
+          actions: [
+            if (reviewing)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 20),
+                child: Center(
+                  child: Text(
+                    tr(context, 'review_progress')
+                        .replaceAll('{index}', '$position')
+                        .replaceAll('{total}', '$total'),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontFeatures: tabularFigures,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+          bottom: reviewing
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: (position - 1) / total),
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 300),
+                      builder: (_, value, _) =>
+                          LinearProgressIndicator(value: value, minHeight: 4),
+                    ),
+                  ),
+                )
+              : null,
+        ),
         body: SafeArea(
           child: Column(
             children: [
               Expanded(
                 child: PageBody(
                   children: [
-                    Text(
-                      tr(context, 'prompt'),
-                      style: Theme.of(context).textTheme.labelLarge
-                          ?.copyWith(color: colors.onSurfaceVariant),
-                    ),
+                    EyebrowLabel(tr(context, 'prompt')),
                     const SizedBox(height: 12),
                     SelectableText(
                       expression.source,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(height: 1.45),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        height: 1.45,
+                      ),
                     ),
-                    if (revealed) ...[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Divider(height: 1),
-                      ),
-                      Text(
-                        tr(context, 'reference_expression'),
-                        style: Theme.of(context).textTheme.labelLarge
-                            ?.copyWith(color: colors.onSurfaceVariant),
-                      ),
-                      const SizedBox(height: 12),
-                      SelectableText(
-                        expression.target,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(height: 1.5),
-                      ),
-                      if (expression.googleTranslation)
-                        const TranslationAttribution(),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          IconButton(
-                            tooltip: tr(context, 'listen'),
-                            onPressed: recording || busy
-                                ? null
-                                : () => action(
-                                    context,
-                                    () => ref
-                                        .read(nativeProvider)
-                                        .api
-                                        .speak(
-                                          expression.target,
-                                          expression.targetLanguage,
-                                        ),
-                                  ),
-                            icon: const Icon(Icons.volume_up_rounded),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.record_voice_over_outlined,
+                          size: 18,
+                          color: colors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            trFill(context, 'say_it_in', {
+                              'language': language,
+                            }),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                          if (expression.audioPath != null)
-                            TextButton.icon(
-                              onPressed: recording || busy
-                                  ? null
-                                  : () => action(
-                                      context,
-                                      () => ref
-                                          .read(nativeProvider)
-                                          .api
-                                          .play(
-                                            expression.audioPath!,
-                                            expression.audioStart ?? 0,
-                                            expression.audioEnd,
-                                          ),
-                                    ),
-                              icon: const Icon(Icons.hearing_rounded),
-                              label: Text(tr(context, 'source_audio')),
-                            ),
-                        ],
-                      ),
-                      if (answer.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Divider(height: 1),
-                        ),
-                        Text(
-                          tr(context, 'your_answer'),
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(color: colors.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: 12),
-                        SelectableText(
-                          answer,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(fontSize: 18, height: 1.6),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (attemptPath != null)
-                              TextButton.icon(
-                                onPressed: recording || busy
-                                    ? null
-                                    : () => action(
-                                        context,
-                                        () => ref
-                                            .read(nativeProvider)
-                                            .api
-                                            .play(attemptPath!, 0, null),
-                                      ),
-                                icon: const Icon(Icons.play_arrow_rounded),
-                                label: Text(tr(context, 'compare')),
-                              ),
-                            TextButton(
-                              onPressed: busy || recording ? null : evaluate,
-                              child: Text(tr(context, 'feedback')),
-                            ),
-                          ],
                         ),
                       ],
-                    ],
+                    ),
+                    AnimatedSize(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topCenter,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (revealed) ...[
+                            const SizedBox(height: 24),
+                            Panel(
+                              color: Color.alphaBlend(
+                                colors.primary.withValues(
+                                  alpha: theme.brightness == Brightness.dark
+                                      ? 0.1
+                                      : 0.07,
+                                ),
+                                surfaceCard(context),
+                              ),
+                              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  EyebrowLabel(
+                                    tr(context, 'reference_expression'),
+                                    color: colors.primary,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: SelectableText(
+                                      expression.target,
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
+                                            height: 1.4,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                    ),
+                                  ),
+                                  if (expression.googleTranslation)
+                                    const TranslationAttribution(),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 4,
+                                    runSpacing: 4,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      TextButton.icon(
+                                        onPressed: recording || busy
+                                            ? null
+                                            : () => play(
+                                                () => native.api.speak(
+                                                  expression.target,
+                                                  expression.targetLanguage,
+                                                ),
+                                              ),
+                                        icon: const Icon(
+                                          Icons.volume_up_rounded,
+                                        ),
+                                        label: Text(tr(context, 'listen')),
+                                      ),
+                                      if (expression.audioPath != null)
+                                        TextButton.icon(
+                                          onPressed: recording || busy
+                                              ? null
+                                              : () => play(
+                                                  () => native.api.play(
+                                                    expression.audioPath!,
+                                                    expression.audioStart ?? 0,
+                                                    expression.audioEnd,
+                                                  ),
+                                                ),
+                                          icon: const Icon(
+                                            Icons.hearing_rounded,
+                                          ),
+                                          label: Text(
+                                            tr(context, 'source_audio'),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (answer.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Panel(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  16,
+                                  12,
+                                  8,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    EyebrowLabel(tr(context, 'your_answer')),
+                                    const SizedBox(height: 10),
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: SelectableText(
+                                        answer,
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              fontSize: 18,
+                                              height: 1.55,
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 4,
+                                      children: [
+                                        if (attemptPath != null)
+                                          TextButton.icon(
+                                            onPressed: recording || busy
+                                                ? null
+                                                : () => play(
+                                                    () => native.api.play(
+                                                      attemptPath!,
+                                                      0,
+                                                      null,
+                                                    ),
+                                                  ),
+                                            icon: const Icon(
+                                              Icons.play_arrow_rounded,
+                                            ),
+                                            label: Text(tr(context, 'compare')),
+                                          ),
+                                        TextButton.icon(
+                                          onPressed: busy || recording
+                                              ? null
+                                              : evaluate,
+                                          icon: const Icon(
+                                            Icons.auto_awesome_outlined,
+                                          ),
+                                          label: Text(tr(context, 'feedback')),
+                                        ),
+                                      ],
+                                    ),
+                                    if (feedback.isNotEmpty) ...[
+                                      const Padding(
+                                        padding: EdgeInsets.fromLTRB(
+                                          0,
+                                          8,
+                                          8,
+                                          12,
+                                        ),
+                                        child: Divider(height: 1),
+                                      ),
+                                      EyebrowLabel(
+                                        tr(context, 'feedback_title'),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          0,
+                                          0,
+                                          8,
+                                          12,
+                                        ),
+                                        child: SelectableText(
+                                          feedback,
+                                          style: theme.textTheme.bodyLarge
+                                              ?.copyWith(height: 1.6),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ],
+                      ),
+                    ),
                     if (busy)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
                         child: LinearProgressIndicator(),
-                      ),
-                    if (feedback.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: SelectableText(
-                          feedback,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(height: 1.6),
-                        ),
                       ),
                   ],
                 ),
@@ -562,7 +921,7 @@ class _PracticePageState extends ConsumerState<PracticePage> {
                 key: const ValueKey('practice-controls'),
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: colors.outlineVariant)),
+                  border: Border(top: BorderSide(color: theme.dividerColor)),
                 ),
                 child: Align(
                   child: ConstrainedBox(
@@ -577,6 +936,12 @@ class _PracticePageState extends ConsumerState<PracticePage> {
                               width: double.infinity,
                               child: FilledButton.icon(
                                 onPressed: busy ? null : toggle,
+                                style: recording
+                                    ? FilledButton.styleFrom(
+                                        backgroundColor: colors.error,
+                                        foregroundColor: colors.onError,
+                                      )
+                                    : null,
                                 icon: Icon(
                                   recording
                                       ? Icons.stop_rounded
@@ -595,11 +960,14 @@ class _PracticePageState extends ConsumerState<PracticePage> {
                               ),
                             ),
                             if (!recording)
-                              TextButton(
-                                onPressed: busy
-                                    ? null
-                                    : () => setState(() => revealed = true),
-                                child: Text(tr(context, 'reveal')),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: TextButton(
+                                  onPressed: busy
+                                      ? null
+                                      : () => setState(() => revealed = true),
+                                  child: Text(tr(context, 'reveal')),
+                                ),
                               ),
                           ] else ...[
                             TextButton.icon(
@@ -608,35 +976,47 @@ class _PracticePageState extends ConsumerState<PracticePage> {
                               label: Text(tr(context, 'try_speaking_again')),
                             ),
                             const SizedBox(height: 8),
-                            IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: busy
-                                          ? null
-                                          : () => review(false),
-                                      child: Text(
-                                        tr(context, 'again'),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
+                            Builder(
+                              builder: (context) {
+                                final again = OutlinedButton(
+                                  onPressed: busy ? null : () => review(false),
+                                  child: _Assessment(
+                                    label: tr(context, 'again'),
+                                    detail: hints ? nextReview(false) : null,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: FilledButton(
-                                      onPressed: busy
-                                          ? null
-                                          : () => review(true),
-                                      child: Text(
-                                        tr(context, 'known'),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
+                                );
+                                final known = FilledButton(
+                                  onPressed: busy ? null : () => review(true),
+                                  child: _Assessment(
+                                    label: tr(context, 'known'),
+                                    detail: hints ? nextReview(true) : null,
                                   ),
-                                ],
-                              ),
+                                );
+                                // Large text stacks the answers so neither
+                                // label breaks mid-word.
+                                if (largeText(context)) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      known,
+                                      const SizedBox(height: 8),
+                                      again,
+                                    ],
+                                  );
+                                }
+                                return IntrinsicHeight(
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(child: again),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: known),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ],
@@ -651,4 +1031,37 @@ class _PracticePageState extends ConsumerState<PracticePage> {
       ),
     );
   }
+}
+
+/// A self-assessment answer with the review it schedules beneath it.
+class _Assessment extends StatelessWidget {
+  final String label;
+  final String? detail;
+  const _Assessment({required this.label, this.detail});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        if (detail != null) ...[
+          const SizedBox(height: 2),
+          Opacity(
+            opacity: 0.8,
+            child: Text(
+              detail!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: DefaultTextStyle.of(context).style.color),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
 }

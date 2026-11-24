@@ -6,7 +6,9 @@ import 'package:dio/dio.dart';
 import '../core/models.dart';
 import '../core/languages.dart';
 import '../core/providers.dart';
+import 'apple_colors.dart';
 import 'common.dart';
+import 'settings_services.dart';
 import 'strings.dart';
 import 'translation_attribution.dart';
 import 'transcript_editor.dart';
@@ -187,42 +189,41 @@ class _RecordingsPageState extends ConsumerState<RecordingsPage> {
                   child: Center(child: CircularProgressIndicator()),
                 ),
               if (collection.hasError)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Column(
-                    children: [
-                      Text(tr(context, errorKey(collection.error!))),
-                      TextButton(
-                        onPressed: () => ref.invalidate(recordingsProvider),
-                        child: Text(tr(context, 'retry')),
-                      ),
-                    ],
+                EmptyState(
+                  icon: Icons.error_outline_rounded,
+                  title: tr(context, errorKey(collection.error!)),
+                  action: TextButton(
+                    onPressed: () => ref.invalidate(recordingsProvider),
+                    child: Text(tr(context, 'retry')),
                   ),
                 ),
               if (!active &&
                   !collection.isLoading &&
                   !collection.hasError &&
                   recordings.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 48),
-                  child: Text(
-                    tr(context, 'no_recordings'),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                EmptyState(
+                  icon: Icons.graphic_eq_rounded,
+                  title: tr(context, 'no_recordings'),
+                  message: tr(context, 'empty_recordings'),
                 ),
               ...recordings.map(
                 (r) => Column(
                   children: [
                     ListTile(
                       key: ValueKey("recording-${r.id}"),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      minLeadingWidth: 40,
+                      horizontalTitleGap: 14,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       trailing: selecting
                           ? null
                           : IconButton(
                               tooltip: tr(context, "delete"),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                               onPressed:
                                   deleting.contains(r.id) ||
                                       (active && current?.id == r.id)
@@ -245,7 +246,12 @@ class _RecordingsPageState extends ConsumerState<RecordingsPage> {
                                       }
                                     }),
                             )
-                          : const Icon(Icons.graphic_eq_rounded),
+                          : _RecordingAvatar(
+                              live: active && current?.id == r.id,
+                              interrupted: r.state == 'interrupted',
+                              // Marks the recording open beside the list.
+                              selected: wide && r.id == selected,
+                            ),
                       title: Text(
                         r.displayTitle.isEmpty
                             ? tr(context, 'untitled')
@@ -254,15 +260,41 @@ class _RecordingsPageState extends ConsumerState<RecordingsPage> {
                             ?.copyWith(
                               fontWeight: FontWeight.w600,
                               height: 1.35,
+                              color: r.displayTitle.isEmpty
+                                  ? Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant
+                                  : null,
                             ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      subtitle: Text(
-                        '${durationText(r.seconds)} · ${MaterialLocalizations.of(context).formatMediumDate(r.created.toLocal())}${r.state == 'interrupted' ? ' · ${tr(context, 'interrupted')}' : ''}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          height: 1.5,
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text:
+                                    '${durationText(r.seconds)} · ${relativeDateTime(context, r.created)}',
+                              ),
+                              if (r.state == 'interrupted')
+                                TextSpan(
+                                  text: ' · ${tr(context, 'interrupted')}',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                height: 1.5,
+                                fontFeatures: tabularFigures,
+                              ),
                         ),
                       ),
                       onTap:
@@ -358,96 +390,119 @@ class _RecordingsPageState extends ConsumerState<RecordingsPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (active) ...[
+                        // The timer drops below the status at large text
+                        // sizes instead of squeezing it.
                         SizedBox(
                           width: double.infinity,
                           child: Wrap(
                             alignment: WrapAlignment.spaceBetween,
                             crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 16,
-                            runSpacing: 8,
+                            spacing: 12,
                             children: [
-                              Text(
-                                durationText(current!.seconds),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall,
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  LevelDot(
+                                    level: current!.level,
+                                    live: current.state == 'recording',
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Flexible(
+                                    child: Semantics(
+                                      liveRegion: true,
+                                      child: Text(
+                                        tr(
+                                          context,
+                                          current.state == 'paused'
+                                              ? 'paused'
+                                              : current.state == 'processing'
+                                              ? 'processing'
+                                              : 'recording',
+                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               Text(
-                                tr(
-                                  context,
-                                  current.state == 'paused'
-                                      ? 'paused'
-                                      : current.state == 'processing'
-                                      ? 'processing'
-                                      : 'recording',
-                                ),
-                                style: TextStyle(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
+                                durationText(current.seconds),
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      fontFeatures: tabularFigures,
+                                    ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 16,
-                          runSpacing: 8,
+                        const SizedBox(height: 14),
+                        Row(
                           children: [
-                            TextButton.icon(
-                              onPressed: current.state == 'processing'
-                                  ? null
-                                  : () => action(context, () async {
-                                      if (current.state == 'paused') {
-                                        await ref
-                                            .read(nativeProvider)
-                                            .api
-                                            .resume();
-                                      } else {
-                                        await ref
-                                            .read(nativeProvider)
-                                            .api
-                                            .pause();
-                                      }
-                                    }),
-                              icon: Icon(
-                                current.state == 'paused'
-                                    ? Icons.play_arrow_rounded
-                                    : Icons.pause_rounded,
-                              ),
-                              label: Text(
-                                tr(
-                                  context,
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: current.state == 'processing'
+                                    ? null
+                                    : () => action(context, () async {
+                                        if (current.state == 'paused') {
+                                          await ref
+                                              .read(nativeProvider)
+                                              .api
+                                              .resume();
+                                        } else {
+                                          await ref
+                                              .read(nativeProvider)
+                                              .api
+                                              .pause();
+                                        }
+                                      }),
+                                icon: Icon(
                                   current.state == 'paused'
-                                      ? 'resume'
-                                      : 'pause',
+                                      ? Icons.play_arrow_rounded
+                                      : Icons.pause_rounded,
+                                ),
+                                label: Text(
+                                  tr(
+                                    context,
+                                    current.state == 'paused'
+                                        ? 'resume'
+                                        : 'pause',
+                                  ),
                                 ),
                               ),
                             ),
-                            FilledButton.icon(
-                              onPressed: current.state == 'processing'
-                                  ? null
-                                  : () => action(context, () async {
-                                      final result = await ref
-                                          .read(nativeProvider)
-                                          .api
-                                          .stop();
-                                      ref
-                                          .read(nativeProvider)
-                                          .sessionChanged(result);
-                                      if (context.mounted) {
-                                        notice(
-                                          context,
-                                          result.state == 'saved'
-                                              ? 'recording_saved'
-                                              : 'interrupted',
-                                        );
-                                      }
-                                    }),
-                              icon: const Icon(Icons.stop_rounded),
-                              label: Text(tr(context, 'stop')),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: current.state == 'processing'
+                                    ? null
+                                    : () => action(context, () async {
+                                        final result = await ref
+                                            .read(nativeProvider)
+                                            .api
+                                            .stop();
+                                        ref
+                                            .read(nativeProvider)
+                                            .sessionChanged(result);
+                                        if (context.mounted) {
+                                          notice(
+                                            context,
+                                            result.state == 'saved'
+                                                ? 'recording_saved'
+                                                : 'interrupted',
+                                          );
+                                        }
+                                      }),
+                                icon: const Icon(Icons.stop_rounded),
+                                label: Text(tr(context, 'stop')),
+                              ),
                             ),
                           ],
                         ),
@@ -526,7 +581,12 @@ class _RecordingsPageState extends ConsumerState<RecordingsPage> {
                 const VerticalDivider(width: 1),
                 Expanded(
                   child: selected == null
-                      ? Center(child: Text(tr(context, 'select_recording')))
+                      ? Center(
+                          child: EmptyState(
+                            icon: Icons.touch_app_outlined,
+                            title: tr(context, 'select_recording'),
+                          ),
+                        )
                       : AbsorbPointer(
                           absorbing: batchBusy,
                           child: ExcludeFocus(
@@ -544,6 +604,50 @@ class _RecordingsPageState extends ConsumerState<RecordingsPage> {
           : list,
     );
   }
+}
+
+/// The leading mark of a recording row: live capture, an interrupted
+/// recording, or an ordinary saved one.
+class _RecordingAvatar extends StatelessWidget {
+  final bool live, interrupted, selected;
+  const _RecordingAvatar({
+    required this.live,
+    required this.interrupted,
+    this.selected = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final tone = live || interrupted ? colors.error : colors.primary;
+    final color = selected ? colors.onPrimary : tone;
+    return ExcludeSemantics(
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: selected ? tone : tone.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          live
+              ? Icons.mic_rounded
+              : interrupted
+              ? Icons.warning_amber_rounded
+              : Icons.graphic_eq_rounded,
+          size: 20,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Tells speakers apart with Apple system colours, starting with the accent.
+Color speakerColor(ColorScheme colors, String speaker) {
+  final apple = AppleColors.of(colors.brightness);
+  final palette = [apple.blue, apple.orange, apple.green, apple.indigo];
+  final index = int.tryParse(speaker) ?? speaker.hashCode.abs();
+  return palette[(index - 1) % palette.length];
 }
 
 class RecordingDetail extends ConsumerStatefulWidget {
@@ -670,6 +774,7 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
   }
 
   Future<void> generate(Recording r, bool summary) async {
+    if (!requireTextModel(context, ref)) return;
     final segments = summary
         ? r.segments
         : r.segments.where((s) => selected.contains(s.id)).toList();
@@ -867,10 +972,46 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${durationText(segment.start)}${segment.speaker == null ? '' : ' · ${tr(context, 'speaker')} ${segment.speaker}'}',
-                      style: Theme.of(context).textTheme.labelMedium
-                          ?.copyWith(color: colors.onSurfaceVariant),
+                    Row(
+                      children: [
+                        if (!selecting) ...[
+                          Icon(
+                            Icons.play_arrow_rounded,
+                            size: 16,
+                            color: colors.primary,
+                          ),
+                          const SizedBox(width: 2),
+                        ],
+                        Text(
+                          durationText(segment.start),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: selecting
+                                    ? colors.onSurfaceVariant
+                                    : colors.primary,
+                                fontFeatures: tabularFigures,
+                              ),
+                        ),
+                        if (segment.speaker != null) ...[
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: speakerColor(colors, segment.speaker!),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              '${tr(context, 'speaker')} ${segment.speaker}',
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(color: colors.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -914,10 +1055,7 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
         .where((s) => selected.contains(s.id))
         .length;
     final colors = Theme.of(context).colorScheme;
-    final localizations = MaterialLocalizations.of(context);
-    final created = r.created.toLocal();
-    final date =
-        '${localizations.formatMediumDate(created)} · ${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(created), alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))}';
+    final date = relativeDateTime(context, r.created);
     final body = Column(
       children: [
         if (widget.embedded)
@@ -937,13 +1075,8 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-          child: Container(
+          child: Panel(
             key: const ValueKey('recording-player'),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(16),
-            ),
             child: Row(
               children: [
                 IconButton.filled(
@@ -966,8 +1099,10 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                     children: [
                       Text(
                         durationText(r.seconds),
-                        style: Theme.of(context).textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: tabularFigures,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -1147,21 +1282,35 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                   ),
                 ),
               if (r.segments.isEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    r.title.isEmpty ? tr(context, 'no_transcript') : r.title,
-                    style: Theme.of(context).textTheme.bodyLarge
-                        ?.copyWith(height: 1.6),
+                if (r.title.isEmpty)
+                  EmptyState(
+                    compact: true,
+                    icon: Icons.notes_rounded,
+                    title: tr(context, 'no_transcript'),
+                    action: FilledButton.icon(
+                      onPressed: busy ? null : () => transcribe(r),
+                      icon: const Icon(Icons.subtitles_outlined),
+                      label: Text(tr(context, 'transcribe')),
+                    ),
+                  )
+                else ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      r.title,
+                      style: Theme.of(context).textTheme.bodyLarge
+                          ?.copyWith(height: 1.6),
+                    ),
                   ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
-                    onPressed: busy ? null : () => transcribe(r),
-                    child: Text(tr(context, 'transcribe')),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.icon(
+                      onPressed: busy ? null : () => transcribe(r),
+                      icon: const Icon(Icons.subtitles_outlined),
+                      label: Text(tr(context, 'transcribe')),
+                    ),
                   ),
-                ),
+                ],
               ] else if (tab == 0) ...[
                 for (var i = 0; i < visible.length; i++) ...[
                   passage(r, visible[i]),
@@ -1169,30 +1318,51 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                 ],
               ] else if (tab == 1) ...[
                 const SizedBox(height: 16),
-                Text(
-                  '${languages[r.sourceLanguage] ?? r.sourceLanguage} → ${languages[r.targetLanguage] ?? r.targetLanguage}',
+                Row(
+                  children: [
+                    Icon(
+                      Icons.translate_rounded,
+                      size: 18,
+                      color: colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '${languages[r.sourceLanguage] ?? r.sourceLanguage} → ${languages[r.targetLanguage] ?? r.targetLanguage}',
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: colors.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: LayoutBuilder(
                     builder: (context, constraints) => Row(
                       key: const ValueKey('recording-translation-controls'),
                       children: [
-                        Expanded(
-                          child: TranslationStylePicker(
-                            value: styleFor(r),
-                            settings: ref.watch(settingsProvider),
-                            onChanged: busy
-                                ? null
-                                : (value) =>
-                                      setState(() => translationStyle = value),
+                        // Styles need a text model; without one the picker
+                        // would only ever show Standard.
+                        if (ref.watch(settingsProvider).usesTextModel) ...[
+                          Expanded(
+                            child: TranslationStylePicker(
+                              value: styleFor(r),
+                              settings: ref.watch(settingsProvider),
+                              onChanged: busy
+                                  ? null
+                                  : (value) => setState(
+                                      () => translationStyle = value,
+                                    ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
+                          const SizedBox(width: 12),
+                        ],
                         ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxWidth: constraints.maxWidth * .42,
+                            maxWidth: ref.watch(settingsProvider).usesTextModel
+                                ? constraints.maxWidth * .42
+                                : constraints.maxWidth,
                           ),
                           child: FilledButton(
                             key: const ValueKey('translate-recording'),
@@ -1227,18 +1397,26 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                   ),
                 ),
                 if (r.translation.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  Text(
-                    tr(context, 'style_${r.translationStyle.name}'),
-                    style: Theme.of(context).textTheme.labelMedium,
+                  const SizedBox(height: 16),
+                  Panel(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        EyebrowLabel(
+                          tr(context, 'style_${r.translationStyle.name}'),
+                          color: colors.primary,
+                        ),
+                        const SizedBox(height: 8),
+                        SelectableText(
+                          r.translation,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(height: 1.65),
+                        ),
+                        if (r.googleTranslation) const TranslationAttribution(),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    r.translation,
-                    style: Theme.of(context).textTheme.bodyLarge
-                        ?.copyWith(height: 1.65),
-                  ),
-                  if (r.googleTranslation) const TranslationAttribution(),
                   const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -1266,26 +1444,48 @@ class _RecordingDetailState extends ConsumerState<RecordingDetail> {
                   ),
                 ],
               ] else if (r.summary.isEmpty) ...[
-                const SizedBox(height: 24),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton(
+                EmptyState(
+                  compact: true,
+                  icon: Icons.lightbulb_outline_rounded,
+                  title: tr(context, 'summary_empty'),
+                  action: FilledButton.icon(
                     onPressed: busy ? null : () => generate(r, true),
-                    child: Text(tr(context, 'summarize')),
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: Text(tr(context, 'summarize')),
                   ),
                 ),
               ] else ...[
+                const SizedBox(height: 8),
                 ...r.summary.map(
                   (point) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     child: ListTile(
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      minLeadingWidth: 12,
+                      leading: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: colors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
                       title: Text(
                         point['text'] as String,
                         style: Theme.of(context).textTheme.bodyLarge
                             ?.copyWith(height: 1.6),
                       ),
-                      trailing: const Icon(Icons.play_circle_outline_rounded),
+                      trailing: Icon(
+                        Icons.play_circle_outline_rounded,
+                        color: colors.primary,
+                        semanticLabel: tr(context, 'play_passage'),
+                      ),
                       onTap: () {
                         final ids = (point['sourceIds'] as List).cast<String>();
                         final origin = r.segments

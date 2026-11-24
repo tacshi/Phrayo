@@ -59,7 +59,8 @@ class SettingsGroup extends StatelessWidget {
   }
 }
 
-/// Leading icon in a tinted rounded square, shared by rows that need one.
+/// Leading icon in a filled rounded square with a white glyph, like iOS
+/// Settings, shared by rows that need one.
 class SettingsIcon extends StatelessWidget {
   final IconData icon;
   final bool destructive;
@@ -73,15 +74,13 @@ class SettingsIcon extends StatelessWidget {
       width: width,
       height: width,
       decoration: BoxDecoration(
-        color: destructive ? colors.errorContainer : colors.secondaryContainer,
+        color: destructive ? colors.error : colors.primary,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
         icon,
         size: 18,
-        color: destructive
-            ? colors.onErrorContainer
-            : colors.onSecondaryContainer,
+        color: destructive ? colors.onError : colors.onPrimary,
       ),
     );
   }
