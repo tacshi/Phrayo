@@ -136,13 +136,13 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
   Widget build(BuildContext context) {
     if (preparing) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          spacing: 8,
+          spacing: 10,
           children: [
             const SizedBox.square(
-              dimension: 20,
+              dimension: 18,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             Flexible(
@@ -154,6 +154,9 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
                     tr(context, 'preparing_speech'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
@@ -175,9 +178,6 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
     if (!prepared && !automatic) {
       return TextButton.icon(
         key: const ValueKey('generate-speech'),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-        ),
         onPressed: widget.enabled ? generate : null,
         icon: const Icon(Icons.graphic_eq_rounded),
         // Wraps like "Translate with Google" rather than truncating.
@@ -188,10 +188,20 @@ class _SpeechButtonState extends ConsumerState<SpeechButton> {
         ),
       );
     }
-    return IconButton(
-      tooltip: tr(context, 'listen'),
-      onPressed: widget.enabled ? listen : null,
-      icon: const Icon(Icons.volume_up_rounded),
+    // The label matches Generate audio in the same place; the tooltip keeps
+    // the action findable by name without repeating it to screen readers.
+    return Tooltip(
+      message: tr(context, 'listen'),
+      excludeFromSemantics: true,
+      child: TextButton.icon(
+        onPressed: widget.enabled ? listen : null,
+        icon: const Icon(Icons.volume_up_rounded),
+        label: Text(
+          tr(context, 'listen'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
     );
   }
 }

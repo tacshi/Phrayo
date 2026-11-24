@@ -12,6 +12,7 @@ import '../core/providers.dart';
 import '../services/platform.dart';
 import 'common.dart';
 import 'library_page.dart';
+import 'settings_services.dart';
 import 'strings.dart';
 import 'speech_button.dart';
 import 'translation_attribution.dart';
@@ -188,6 +189,8 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
       if (current.state != 'recording') {
         resetGesture();
         heldSessionId = null;
+      } else {
+        unawaited(HapticFeedback.mediumImpact());
       }
     } catch (e) {
       if (mounted) {
@@ -239,6 +242,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
           native.sessionChanged(result);
         }
       } else {
+        unawaited(HapticFeedback.selectionClick());
         final result = await native.api.stop();
         if (mounted && native.current?.id == id) native.sessionChanged(result);
       }
@@ -335,6 +339,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
   }
 
   Future<void> process(String key) async {
+    if (!requireTextModel(context, ref)) return;
     final generation = ++revision;
     cancellation?.cancel();
     final token = CancelToken();
@@ -371,6 +376,50 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     } finally {
       if (mounted && generation == revision) setState(() => busy = false);
     }
+  }
+
+  /// Swaps spoken and target languages. Like a translator's swap, an
+  /// expression on screen becomes the text to translate back.
+  Future<void> swapLanguages() async {
+    if (changingLanguage) return;
+    final settings = ref.read(settingsProvider);
+    if (settings.source == settings.target) return;
+    final expression = output.trim();
+    unawaited(HapticFeedback.selectionClick());
+    setState(() => changingLanguage = true);
+    var swapped = false;
+    await action(context, () async {
+      await ref
+          .read(settingsProvider.notifier)
+          .save(
+            AppSettings.fromJson({
+              ...settings.toJson(),
+              'source': settings.target,
+              'target': settings.source,
+            }),
+          );
+      swapped = true;
+    });
+    if (!mounted) return;
+    setState(() {
+      changingLanguage = false;
+      if (swapped && expression.isNotEmpty) {
+        input.text = expression;
+        // The recording was spoken in the previous language.
+        recordingDetached = true;
+      }
+    });
+  }
+
+  Future<void> copyOutput() async {
+    await Clipboard.setData(ClipboardData(text: output.trim()));
+    unawaited(HapticFeedback.lightImpact());
+    if (mounted) notice(context, 'copied_toast');
+  }
+
+  void clearInput() {
+    input.clear();
+    changed();
   }
 
   Expression expression() {
@@ -513,7 +562,24 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
     final typing = inputFocus.hasFocus;
     final idle = !recording && !processing && !starting && !finishing;
     final settings = ref.watch(settingsProvider);
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final inputEnabled = !recording && !processing && !starting && !finishing;
+    final showIntro =
+        idle &&
+        !typing &&
+        !busy &&
+        input.text.isEmpty &&
+        output.isEmpty &&
+        expressions != null &&
+        expressions.isEmpty;
+    // The expression is the page's answer, so it sits on a tinted panel.
+    final resultColor = Color.alphaBlend(
+      colors.primary.withValues(
+        alpha: theme.brightness == Brightness.dark ? 0.1 : 0.07,
+      ),
+      surfaceCard(context),
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxHeight < 360;
@@ -523,174 +589,338 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
             Expanded(
               child: PageBody(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _LanguageDropdown(
-                          key: const ValueKey('speak-source-language'),
-                          label: tr(context, 'source_language'),
-                          value: settings.source,
-                          onChanged: languagesLocked
-                              ? null
-                              : (value) => changeLanguage('source', value),
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
-                        child: Icon(Icons.arrow_forward_rounded, size: 18),
-                      ),
-                      Expanded(
-                        child: _LanguageDropdown(
-                          key: const ValueKey('speak-target-language'),
-                          label: tr(context, 'target_language'),
-                          value: settings.target,
-                          onChanged: languagesLocked
-                              ? null
-                              : (value) => changeLanguage('target', value),
-                        ),
-                      ),
-                    ],
+                  _LanguageBar(
+                    source: settings.source,
+                    target: settings.target,
+                    onSource: languagesLocked
+                        ? null
+                        : (value) => changeLanguage('source', value),
+                    onTarget: languagesLocked
+                        ? null
+                        : (value) => changeLanguage('target', value),
+                    onSwap:
+                        languagesLocked || settings.source == settings.target
+                        ? null
+                        : swapLanguages,
                   ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    key: const ValueKey('speak-input'),
-                    controller: input,
-                    focusNode: inputFocus,
-                    minLines: 2,
-                    maxLines: 6,
-                    enabled:
-                        !recording && !processing && !starting && !finishing,
-                    // Return translates; long phrases still wrap.
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => submitTyped(),
-                    onTapOutside: (_) => inputFocus.unfocus(),
-                    decoration: InputDecoration(
-                      labelText: tr(context, 'original'),
-                      hintText: tr(context, 'type_hint'),
-                      filled: false,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      border: UnderlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                      ),
-                      enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                      ),
-                    ),
-                    onChanged: (_) => changed(),
-                  ),
-                  if (input.text.isNotEmpty &&
-                      !recording &&
-                      !processing &&
-                      !starting) ...[
-                    const SizedBox(height: 16),
-                    Row(
+                  const SizedBox(height: 12),
+                  Panel(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: TranslationStylePicker(
-                            value: style,
-                            settings: settings,
-                            onChanged: busy
-                                ? null
-                                : (value) {
-                                    changed();
-                                    setState(() => style = value);
-                                  },
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: EyebrowLabel(tr(context, 'original')),
+                              ),
+                              if (input.text.isNotEmpty && inputEnabled)
+                                // Part of the field, so clearing while typing
+                                // keeps the keyboard up.
+                                TextFieldTapRegion(
+                                  child: IconButton(
+                                    key: const ValueKey('speak-clear'),
+                                    tooltip: tr(context, 'clear_input'),
+                                    onPressed: clearInput,
+                                    color: colors.onSurfaceVariant,
+                                    icon: const Icon(
+                                      Icons.cancel_rounded,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: TextButton(
-                            key: const ValueKey('translate-speech'),
-                            onPressed:
-                                busy ||
-                                    changingLanguage ||
-                                    input.text.trim().isEmpty
-                                ? null
-                                : translate,
-                            child: Text(
-                              tr(
-                                context,
-                                usesGoogleTranslation(settings)
-                                    ? 'translate_google'
-                                    : 'translate',
+                        Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: TextField(
+                            key: const ValueKey('speak-input'),
+                            controller: input,
+                            focusNode: inputFocus,
+                            minLines: 2,
+                            maxLines: 6,
+                            enabled: inputEnabled,
+                            // Return translates; long phrases still wrap.
+                            keyboardType: TextInputType.text,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => submitTyped(),
+                            onTapOutside: (_) => inputFocus.unfocus(),
+                            // A live transcript stays legible while the field
+                            // is locked for capture.
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: colors.onSurface,
+                              height: 1.45,
+                            ),
+                            decoration: InputDecoration(
+                              // No typing hint while the microphone fills it.
+                              hintText: inputEnabled
+                                  ? tr(
+                                      context,
+                                      typing
+                                          ? 'type_hint'
+                                          : 'speak_or_type_hint',
+                                    )
+                                  : null,
+                              hintMaxLines: 2,
+                              hintStyle: theme.textTheme.titleMedium?.copyWith(
+                                color: colors.onSurfaceVariant.withValues(
+                                  alpha: 0.7,
+                                ),
+                                height: 1.45,
                               ),
+                              filled: false,
+                              isCollapsed: true,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: const EdgeInsets.only(bottom: 12),
+                            ),
+                            onChanged: (_) => changed(),
+                          ),
+                        ),
+                        // Once the expression is showing, Translate has done
+                        // its job; editing or a new style brings it back.
+                        if (input.text.isNotEmpty &&
+                            !recording &&
+                            !processing &&
+                            !starting &&
+                            (output.isEmpty || settings.usesTextModel))
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 4, 12, 12),
+                            child: LayoutBuilder(
+                              builder: (context, row) {
+                                final translateButton = FilledButton.tonalIcon(
+                                  key: const ValueKey('translate-speech'),
+                                  onPressed:
+                                      busy ||
+                                          changingLanguage ||
+                                          input.text.trim().isEmpty
+                                      ? null
+                                      : translate,
+                                  icon: const Icon(
+                                    Icons.translate_rounded,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    tr(
+                                      context,
+                                      usesGoogleTranslation(settings)
+                                          ? 'translate_google'
+                                          : 'translate',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                );
+                                // Styles need a text model; without one the
+                                // picker would only ever show Standard.
+                                if (!settings.usesTextModel) {
+                                  return Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: translateButton,
+                                  );
+                                }
+                                final picker = TranslationStylePicker(
+                                  value: style,
+                                  settings: settings,
+                                  onChanged: busy
+                                      ? null
+                                      : (value) {
+                                          changed();
+                                          setState(() => style = value);
+                                        },
+                                );
+                                if (output.isNotEmpty) return picker;
+                                return Row(
+                                  children: [
+                                    Expanded(child: picker),
+                                    const SizedBox(width: 12),
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: row.maxWidth * 0.5,
+                                      ),
+                                      child: translateButton,
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
                           ),
-                        ),
                       ],
                     ),
-                  ],
-                  if (busy) const LinearProgressIndicator(),
-                  if (output.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                  ),
+                  if (busy && output.isEmpty) ...[
+                    const SizedBox(height: 12),
+                    Panel(
+                      color: resultColor,
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            tr(context, 'translation'),
-                            style: Theme.of(context).textTheme.labelLarge,
+                          Semantics(
+                            liveRegion: true,
+                            child: EyebrowLabel(
+                              tr(context, 'translating_status'),
+                              color: colors.primary,
+                            ),
                           ),
-                          const SizedBox(height: 14),
-                          SelectableText(
-                            output,
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(height: 1.4),
+                          const SizedBox(height: 16),
+                          const LinearProgressIndicator(),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (output.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Panel(
+                      color: resultColor,
+                      padding: const EdgeInsets.fromLTRB(20, 4, 8, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Actions move under the label when they would
+                          // otherwise squeeze it.
+                          SizedBox(
+                            width: double.infinity,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  child: EyebrowLabel(
+                                    tr(context, 'translation'),
+                                    color: colors.primary,
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: tr(
+                                        context,
+                                        saved ? 'saved' : 'save',
+                                      ),
+                                      onPressed:
+                                          busy ||
+                                              saving ||
+                                              saved ||
+                                              expressions == null
+                                          ? null
+                                          : () => action(context, () async {
+                                              setState(() => saving = true);
+                                              try {
+                                                final phrase = expression();
+                                                await ref
+                                                    .read(databaseProvider)
+                                                    .put(
+                                                      phrase.id,
+                                                      'expression',
+                                                      phrase.toJson(),
+                                                    );
+                                                unawaited(
+                                                  HapticFeedback.lightImpact(),
+                                                );
+                                              } finally {
+                                                if (mounted) {
+                                                  setState(
+                                                    () => saving = false,
+                                                  );
+                                                }
+                                              }
+                                            }),
+                                      // A saved expression stays clearly marked,
+                                      // not greyed out like an unavailable action.
+                                      color: colors.primary,
+                                      disabledColor: saved
+                                          ? colors.primary
+                                          : null,
+                                      icon: Icon(
+                                        saved
+                                            ? Icons.bookmark_added
+                                            : Icons.bookmark_add_outlined,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      key: const ValueKey('copy-expression'),
+                                      tooltip: tr(context, 'copy'),
+                                      // A rewrite in progress is incomplete.
+                                      onPressed: busy ? null : copyOutput,
+                                      icon: const Icon(
+                                        Icons.copy_rounded,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      tooltip: tr(context, 'more'),
+                                      enabled: !busy,
+                                      icon: const Icon(
+                                        Icons.more_horiz_rounded,
+                                      ),
+                                      onSelected: process,
+                                      itemBuilder: (_) => [
+                                        for (final (key, icon) in [
+                                          (
+                                            'natural',
+                                            Icons.auto_awesome_outlined,
+                                          ),
+                                          (
+                                            'polite',
+                                            Icons.favorite_border_rounded,
+                                          ),
+                                          ('shorter', Icons.short_text_rounded),
+                                        ])
+                                          _menuItem(key, icon),
+                                        const PopupMenuDivider(),
+                                        _menuItem(
+                                          'explain',
+                                          Icons.lightbulb_outline_rounded,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: SelectableText(
+                              output,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                           if (googleTranslation) const TranslationAttribution(),
-                          const SizedBox(height: 20),
-                          Row(
-                            spacing: 8,
-                            children: [
-                              // Audio controls carry the longest labels.
-                              Flexible(
-                                flex: 3,
-                                child: SpeechButton(
+                          if (busy)
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(0, 16, 12, 0),
+                              child: LinearProgressIndicator(),
+                            ),
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.only(right: 12),
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                SpeechButton(
                                   text: output,
                                   language: settings.target,
                                   enabled: !busy && !recording && !starting,
                                 ),
-                              ),
-                              IconButton(
-                                tooltip: tr(context, saved ? 'saved' : 'save'),
-                                onPressed:
-                                    busy ||
-                                        saving ||
-                                        saved ||
-                                        expressions == null
-                                    ? null
-                                    : () => action(context, () async {
-                                        setState(() => saving = true);
-                                        try {
-                                          final phrase = expression();
-                                          await ref
-                                              .read(databaseProvider)
-                                              .put(
-                                                phrase.id,
-                                                'expression',
-                                                phrase.toJson(),
-                                              );
-                                        } finally {
-                                          if (mounted) {
-                                            setState(() => saving = false);
-                                          }
-                                        }
-                                      }),
-                                icon: Icon(
-                                  saved
-                                      ? Icons.bookmark_added
-                                      : Icons.bookmark_add_outlined,
-                                ),
-                              ),
-                              Flexible(
-                                flex: 2,
-                                child: TextButton(
+                                FilledButton.icon(
+                                  key: const ValueKey('practise-expression'),
                                   onPressed: busy
                                       ? null
                                       : () =>
@@ -704,33 +934,66 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                                 ),
                                               ),
                                             ),
-                                  child: Text(tr(context, 'practice')),
+                                  icon: const Icon(
+                                    Icons.record_voice_over_rounded,
+                                    size: 18,
+                                  ),
+                                  label: Text(tr(context, 'practice')),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (explanation.isNotEmpty) ...[
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(0, 16, 12, 16),
+                              child: Divider(height: 1),
+                            ),
+                            EyebrowLabel(tr(context, 'explanation_title')),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: SelectableText(
+                                explanation,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  height: 1.55,
                                 ),
                               ),
-                              PopupMenuButton<String>(
-                                tooltip: tr(context, 'more'),
-                                enabled: !busy && settings.usesTextModel,
-                                onSelected: process,
-                                itemBuilder: (_) =>
-                                    ['natural', 'polite', 'shorter', 'explain']
-                                        .map(
-                                          (key) => PopupMenuItem(
-                                            value: key,
-                                            child: Text(tr(context, key)),
-                                          ),
-                                        )
-                                        .toList(),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                   ],
-                  if (explanation.isNotEmpty)
+                  if (showIntro)
                     Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: SelectableText(explanation),
+                      padding: const EdgeInsets.fromLTRB(16, 40, 16, 0),
+                      child: Column(
+                        children: [
+                          const SproutLogo(size: 52),
+                          const SizedBox(height: 16),
+                          Text(
+                            tr(context, 'speak_intro_title'),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            trFill(context, 'speak_intro_body', {
+                              'source':
+                                  languages[settings.source] ?? settings.source,
+                              'target':
+                                  languages[settings.target] ?? settings.target,
+                            }),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.onSurfaceVariant,
+                              height: 1.55,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                 ],
               ),
@@ -761,13 +1024,29 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Semantics(
                           liveRegion: true,
-                          child: Text(
-                            '${tr(context, processing
-                                ? 'processing'
-                                : recording
-                                ? 'listening'
-                                : 'preparing_audio')} ${recording ? durationText(session.seconds) : ''}',
-                            textAlign: TextAlign.center,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (recording) ...[
+                                LevelDot(level: session.level),
+                                const SizedBox(width: 10),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  '${tr(context, processing
+                                          ? 'processing'
+                                          : recording
+                                          ? 'listening'
+                                          : 'preparing_audio')} ${recording ? durationText(session.seconds) : ''}'
+                                      .trim(),
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                    fontFeatures: tabularFigures,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -801,6 +1080,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                       },
                                 style: TextButton.styleFrom(
                                   minimumSize: const Size(48, 48),
+                                  shape: const StadiumBorder(),
                                   foregroundColor: cancelArmed
                                       ? colors.onErrorContainer
                                       : colors.onSurfaceVariant,
@@ -838,6 +1118,10 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                           child: IconButton(
                             key: const ValueKey('type-instead'),
                             tooltip: tr(context, 'type_instead'),
+                            style: IconButton.styleFrom(
+                              backgroundColor: colors.surfaceContainerHighest,
+                              fixedSize: const Size.square(48),
+                            ),
                             onPressed: idle && controlEnabled
                                 ? startTyping
                                 : null,
@@ -903,7 +1187,9 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                 decoration: BoxDecoration(
                                   color: recording
                                       ? colors.primaryContainer
-                                      : colors.primary,
+                                      : controlEnabled
+                                      ? colors.primary
+                                      : colors.primary.withValues(alpha: 0.4),
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     if (recording)
@@ -913,6 +1199,15 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                         ),
                                         spreadRadius: 6 + (session.level * 8),
                                         blurRadius: 0,
+                                      )
+                                    else if (controlEnabled)
+                                      BoxShadow(
+                                        color: colors.primary.withValues(
+                                          alpha: 0.22,
+                                        ),
+                                        blurRadius: 24,
+                                        spreadRadius: -2,
+                                        offset: const Offset(0, 8),
                                       ),
                                   ],
                                 ),
@@ -920,7 +1215,7 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                                   recording
                                       ? Icons.stop_rounded
                                       : Icons.mic_rounded,
-                                  size: 36,
+                                  size: compact ? 30 : 38,
                                   color: recording
                                       ? colors.onPrimaryContainer
                                       : colors.onPrimary,
@@ -945,8 +1240,9 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
                         child: ExcludeSemantics(
                           child: Text(
                             tr(context, 'hold_to_speak'),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: colors.onSurfaceVariant),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ),
@@ -959,16 +1255,120 @@ class _SpeakPageState extends ConsumerState<SpeakPage> {
       },
     );
   }
+
+  PopupMenuItem<String> _menuItem(String key, IconData icon) => PopupMenuItem(
+    value: key,
+    child: Row(
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(width: 12),
+        Flexible(child: Text(tr(context, key))),
+      ],
+    ),
+  );
+}
+
+/// Spoken and target languages, with a swap between them.
+class _LanguageBar extends StatelessWidget {
+  final String source, target;
+  final ValueChanged<String>? onSource, onTarget;
+  final VoidCallback? onSwap;
+  const _LanguageBar({
+    required this.source,
+    required this.target,
+    required this.onSource,
+    required this.onTarget,
+    required this.onSwap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final stacked = largeText(context);
+    final from = _LanguageDropdown(
+      key: const ValueKey('speak-source-language'),
+      label: tr(context, 'source_language'),
+      value: source,
+      onChanged: onSource,
+      centered: !stacked,
+    );
+    final to = _LanguageDropdown(
+      key: const ValueKey('speak-target-language'),
+      label: tr(context, 'target_language'),
+      value: target,
+      onChanged: onTarget,
+      centered: !stacked,
+    );
+    // Large text gives each language its own line, like a vertical
+    // translator, so names never break mid-word.
+    if (stacked) {
+      return Panel(
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 4, 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(children: [from, const Divider(height: 1), to]),
+            ),
+            _SwapButton(onPressed: onSwap, vertical: true),
+          ],
+        ),
+      );
+    }
+    return Panel(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Expanded(child: from),
+          _SwapButton(onPressed: onSwap),
+          Expanded(child: to),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwapButton extends StatefulWidget {
+  final VoidCallback? onPressed;
+  final bool vertical;
+  const _SwapButton({required this.onPressed, this.vertical = false});
+  @override
+  State<_SwapButton> createState() => _SwapButtonState();
+}
+
+class _SwapButtonState extends State<_SwapButton> {
+  double turns = 0;
+  @override
+  Widget build(BuildContext context) => IconButton(
+    key: const ValueKey('speak-swap-languages'),
+    tooltip: tr(context, 'swap_languages'),
+    onPressed: widget.onPressed == null
+        ? null
+        : () {
+            setState(() => turns += 0.5);
+            widget.onPressed!();
+          },
+    icon: AnimatedRotation(
+      turns: turns,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      child: Icon(
+        widget.vertical ? Icons.swap_vert_rounded : Icons.swap_horiz_rounded,
+      ),
+    ),
+  );
 }
 
 class _LanguageDropdown extends StatelessWidget {
   final String label, value;
   final ValueChanged<String>? onChanged;
+  final bool centered;
   const _LanguageDropdown({
     super.key,
     required this.label,
     required this.value,
     this.onChanged,
+    this.centered = true,
   });
 
   @override
@@ -986,20 +1386,49 @@ class _LanguageDropdown extends StatelessWidget {
           isExpanded: true,
           itemHeight: null,
           menuWidth: 280,
-          menuMaxHeight: 400,
+          // Large text fits fewer languages per screen, so the menu grows.
+          menuMaxHeight: largeText(context)
+              ? MediaQuery.sizeOf(context).height * 0.7
+              : 400,
           borderRadius: BorderRadius.circular(12),
           underline: const SizedBox.shrink(),
-          style: Theme.of(context).textTheme.labelLarge,
+          // The arrow sits beside the centred name instead.
+          icon: const SizedBox.shrink(),
+          alignment: centered
+              ? AlignmentDirectional.center
+              : AlignmentDirectional.centerStart,
+          style: Theme.of(context).textTheme.titleSmall
+              ?.copyWith(fontWeight: FontWeight.w600),
           selectedItemBuilder: (_) => [
             for (final name in choices.values)
               ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 48),
+                constraints: const BoxConstraints(minHeight: 52),
                 child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  alignment: centered
+                      ? Alignment.center
+                      : AlignmentDirectional.centerStart,
+                  child: Builder(
+                    builder: (context) => Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: centered
+                                ? TextAlign.center
+                                : TextAlign.start,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.expand_more_rounded,
+                          size: 18,
+                          color: DefaultTextStyle.of(context).style.color,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

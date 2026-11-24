@@ -106,11 +106,12 @@ void main() {
         await tester.pumpAndSettle();
         // With a text model the default style is Conversational, so the
         // transcript is translated in that style instead of showing the plain
-        // live translation.
+        // live translation. Without one, styles are unavailable and hidden.
         expect(
-          find.text(model ? 'Conversational' : 'Standard'),
-          findsOneWidget,
+          find.text('Conversational'),
+          model ? findsOneWidget : findsNothing,
         );
+        expect(find.text('Standard'), findsNothing);
         expect(
           find.text(model ? 'Model translation' : 'Old translation'),
           findsOneWidget,
@@ -144,7 +145,7 @@ void main() {
         await tester.ensureVisible(input);
         await tester.enterText(input, '   ');
         await tester.pumpAndSettle();
-        expect(tester.widget<TextButton>(translate).onPressed, isNull);
+        expect(tester.widget<ButtonStyleButton>(translate).onPressed, isNull);
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pumpAndSettle();
         index.dispose();
@@ -178,7 +179,7 @@ void main() {
       await tester.pump();
       await tester.tap(translate);
       await tester.pump();
-      expect(tester.widget<TextButton>(translate).onPressed, isNull);
+      expect(tester.widget<ButtonStyleButton>(translate).onPressed, isNull);
       await tester.enterText(input, 'Second edit');
       await tester.pump();
       api.pending!.complete('Stale translation');
@@ -191,7 +192,7 @@ void main() {
       api.pending!.completeError(StateError('resources_missing'));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(input).controller!.text, 'Second edit');
-      expect(tester.widget<TextButton>(translate).onPressed, isNotNull);
+      expect(tester.widget<ButtonStyleButton>(translate).onPressed, isNotNull);
       api.pending = null;
       await tester.tap(translate);
       await tester.pumpAndSettle();

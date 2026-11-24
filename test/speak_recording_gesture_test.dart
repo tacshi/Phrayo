@@ -213,7 +213,7 @@ void main() {
   );
 
   testWidgets(
-    'sliding back disarms cancellation and haptics occur only on entry',
+    'sliding back disarms cancellation and its haptic occurs only on entry',
     (tester) async {
       final haptics = <Object?>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -239,13 +239,18 @@ void main() {
       await tester.pump();
       await gesture.moveTo(target + const Offset(1, 1));
       await tester.pump();
-      expect(haptics, ['HapticFeedbackType.lightImpact']);
+      // Starting to record confirms itself once; arming Cancel adds one.
+      expect(haptics, [
+        'HapticFeedbackType.mediumImpact',
+        'HapticFeedbackType.lightImpact',
+      ]);
       await gesture.moveTo(tester.getCenter(microphone));
       await tester.pumpAndSettle();
       expect(find.text('Slide up to cancel'), findsOneWidget);
       await gesture.moveTo(target);
       await tester.pump();
-      expect(haptics.length, 2);
+      expect(haptics.length, 3);
+      expect(haptics.last, 'HapticFeedbackType.lightImpact');
       await gesture.moveTo(tester.getCenter(microphone));
       await gesture.up();
       await tester.pumpAndSettle();
