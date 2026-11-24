@@ -225,4 +225,43 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets('the side rail stays put and page titles sit beside it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1024, 768);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final native = NativeBridge(api: DesignNative());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          bootstrapProvider.overrideWith((ref) async {}),
+          expressionsProvider.overrideWith((ref) => Stream.value([])),
+          recordingsProvider.overrideWith((ref) => Stream.value([])),
+          nativeProvider.overrideWithValue(native),
+        ],
+        child: const PhrayoApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final rail = find.byType(NavigationRail);
+    final railTop = tester.getTopLeft(rail).dy;
+    for (final tab in ['Expressions', 'Recordings', 'Settings', 'Speak']) {
+      await tester.tap(find.descendant(of: rail, matching: find.text(tab)));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(rail).dy, railTop, reason: tab);
+      for (final bar in tester.widgetList<AppBar>(find.byType(AppBar))) {
+        expect(
+          tester.getTopLeft(find.byWidget(bar)).dx,
+          greaterThanOrEqualTo(tester.getTopRight(rail).dx),
+          reason: tab,
+        );
+      }
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    await native.dispose();
+  });
 }
